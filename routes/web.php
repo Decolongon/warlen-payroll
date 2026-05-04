@@ -17,7 +17,6 @@ use App\Http\Controllers\HrRole\HRAIInsightController;
 use App\Http\Controllers\HrRole\HRAttendanceImportController;
 use App\Http\Controllers\HrRole\HRApplicationLeaveController;
 use App\Http\Controllers\HrRole\HRAttendanceController;
-use App\Http\Controllers\HrRole\HRAttendanceImportController;
 use App\Http\Controllers\HrRole\HRBranchController;
 use App\Http\Controllers\HrRole\HRContributionVersionController;
 use App\Http\Controllers\HrRole\HRDashboardController;
