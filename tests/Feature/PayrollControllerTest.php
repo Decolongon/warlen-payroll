@@ -7,12 +7,10 @@ use App\Models\PayrollItem;
 use App\Models\PayrollPeriod;
 use App\Models\Position;
 use App\Models\Site;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
 
-uses(RefreshDatabase::class);
 
 // ---------------------------------------------------------------------------
 // Helpers
