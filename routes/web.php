@@ -42,23 +42,17 @@ Route::get('/', function () {
     return Inertia::render('auth/login');
 })->name('home')->middleware(HomeMiddleware::class);
 
-// ─── Shared auth routes (admin + hr share these email endpoints) ──────────────
-Route::middleware(['auth', 'auth.session', 'throttle:limit-actions'])->group(function () {
-    // Admin payroll email routes
-    Route::post('/payrolls/{payroll}/email', [PayrollController::class, 'emailPayroll'])->name('payrolls.email');
-    Route::post('/payrolls/bulk-email', [PayrollController::class, 'bulkEmail'])->name('payrolls.bulk-email');
-
-    // HR payroll email routes
-    Route::post('/hr/payrolls/{payroll}/email', [HrPayrollController::class, 'emailPayroll'])->name('hr.payroll.email');
-    Route::post('/hr/payrolls/bulk-email', [HrPayrollController::class, 'bulkEmail'])->name('hr.payroll.bulk-email');
-});
-
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 Route::middleware(['auth', 'admin', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class.':100'])->group(function () {
 
 	Route::get('payroll', function () {
 		return Inertia::render('payroll/index');
 	});
+
+     // Admin payroll email routes
+    Route::post('/payrolls/{payroll}/email', [PayrollController::class, 'emailPayroll'])->name('payrolls.email');
+    Route::post('/payrolls/bulk-email', [PayrollController::class, 'bulkEmail'])->name('payrolls.bulk-email');
+
 	Route::post('/employees/bulk-assign-position', [EmployeeController::class, 'bulkAssignPosition'])->name('employees.bulk-assign-position');
 	Route::post('/employees/bulk-assign-branch-site', [EmployeeController::class, 'bulkAssignBranchSite'])->name('employees.bulk-assign-branch-site');
 	Route::delete('/employees/bulk-destroy', [EmployeeController::class, 'bulkDestroy']);
@@ -149,6 +143,11 @@ Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPe
     Route::get('hr/attendances', [HRAttendanceController::class, 'attendanceManagement'])->name('hr.attendances.index');
     Route::post('/hr/attendance/import', [HRAttendanceImportController::class, 'store'])->name('hr.attendance.import');
 
+
+     // HR payroll email routes
+    Route::post('/hr/payrolls/{payroll}/email', [HrPayrollController::class, 'emailPayroll'])->name('hr.payroll.email');
+    Route::post('/hr/payrolls/bulk-email', [HrPayrollController::class, 'bulkEmail'])->name('hr.payroll.bulk-email');
+
     // HR contribution settings
     Route::get('/hr/employee-contribution-settings', [EmployeeContributionSettingsController::class, 'getSettingsByVersion']);
     Route::get('/hr/employees/list', [EmployeeContributionSettingsController::class, 'getEmployees']);
@@ -156,7 +155,7 @@ Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPe
 
     // HR payroll-specific routes — MUST be before resource() to avoid ID conflicts
     Route::get('/hr/payrolls/export-all', [HrPayrollController::class, 'exportAll'])->name('hr.payroll.export-all');
-    Route::get('/hr/payrolls/{id}/print-data', [HrPayrollController::class, 'getPrintData'])->name('hr.payroll.print-data');
+    Route::get('/hr/payroll/{id}/print-data', [HrPayrollController::class, 'getPrintData'])->name('hr.payroll.print-data');
 
     // HR payroll resource
     Route::resource('/hr/payroll', HrPayrollController::class)->names([
