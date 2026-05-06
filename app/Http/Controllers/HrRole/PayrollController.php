@@ -2,12 +2,19 @@
 
 namespace App\Http\Controllers\HrRole;
 
+use App\Events\BulkEmailRequested;
 use App\Http\Controllers\Controller;
+use App\Mail\PayrollSummaryMail;
 use App\Models\Payroll;
 use App\Services\PayrollService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use App\Traits\HasPaginatedIndex;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class PayrollController extends Controller
@@ -144,12 +151,12 @@ class PayrollController extends Controller
      */
     public function destroy($id)
     {
-        $payroll = Payroll::findOrFail($id);
-        Gate::authorize('delete', $payroll);
+        // $payroll = Payroll::findOrFail($id);
+        // Gate::authorize('delete', $payroll);
 
-        $payroll->delete();
+        // $payroll->delete();
 
-        return redirect()->back()->with('success', 'Payroll record deleted successfully');
+        // return redirect()->back()->with('success', 'Payroll record deleted successfully');
     }
 
     /**
@@ -183,4 +190,69 @@ class PayrollController extends Controller
     {
         //
     }
+     public function emailPayroll(Payroll $payroll): JsonResponse
+    {
+        try {
+            // Force load all required relationships
+            $payroll->loadMissing([
+                'employee.user',
+                'payrollPeriod',
+                'payrollItems',
+                'employee.position'
+            ]);
+
+            Gate::authorize('emailPayroll', $payroll);
+
+            $email = $payroll->employee?->user?->email;
+            if (!$email) {
+                Log::warning('No email address for payroll', ['payroll_id' => $payroll->id]);
+                return response()->json(['message' => 'Employee has no email address.'], 422);
+            }
+
+            Mail::to($email)->queue(new PayrollSummaryMail($payroll, Auth::user()?->name));
+
+            Log::info('Payroll email sent', ['payroll_id' => $payroll->id, 'email' => $email]);
+            return response()->json(['message' => 'Payroll summary queued successfully.']);
+        } catch (\Exception $e) {
+            Log::error('Email sending failed', [
+                'payroll_id' => $payroll->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to send email: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    public function bulkEmail(Request $request): JsonResponse
+    {
+        // $ids = $request->input('ids', []);
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct', Rule::exists('payrolls', 'id')],
+        ]);
+
+        $ids = $validated['ids'];
+
+        if (empty($ids)) {
+            return response()->json(['message' => 'No payroll IDs provided.'], 422);
+        }
+
+        BulkEmailRequested::dispatch($ids, Auth::id());
+
+        return response()->json([
+            'message' => 'Bulk email request accepted. The emails will be queued and sent in the background.',
+        ], 202);
+    }
+    //export the data based on filter
+    public function exportAll(Request $request)
+    {
+        Gate::authorize('viewAny', Payroll::class);
+
+        return response()->json(
+            $this->payrollService->getFilteredPayrollsQuery($request)->get()
+        );
+    }
+    
 }
