@@ -6,13 +6,14 @@ use App\Events\PayrollEvent;
 use App\Models\AttendancePeriodStat;
 use App\Models\Payroll;
 use App\Models\PayrollPeriod;
+use App\Services\EmployeeLookUpService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Collection;
 
 class PayrollProcessingService
 {
-    protected EmployeeLookupService $employeeLookupService;
+    protected EmployeeLookUpService $employeeLookupService;
     protected ContributionService $contributionService;
     protected IncentiveService $incentiveService;
     protected DeductionService $deductionService;
@@ -24,7 +25,7 @@ class PayrollProcessingService
 
     public function __construct()
     {
-        $this->employeeLookupService = new EmployeeLookupService();
+        $this->employeeLookupService = new EmployeeLookUpService();
         $this->contributionService = new ContributionService();
         $this->incentiveService = new IncentiveService();
         $this->deductionService = new DeductionService();
