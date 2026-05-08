@@ -8,7 +8,7 @@ trait CacheTrait
 {
     protected function cacheRemember(string $key, callable $callback, int $ttl = 60)
     {
-        return Cache::remember($key, $callback, $ttl);
+        return Cache::remember($key, $ttl, $callback);
     }
 
     protected function cacheRememberForever(string $key, callable $callback)
