@@ -33,7 +33,7 @@ class HREmployeeController extends Controller
     {
         Gate::authorize('viewAny', Employee::class);
 
-        $employees = $this->cacheRemember('hr-employees', 60, fn() => $this->employeeRepository->getEmployees());
+        $employees = $this->cacheRemember('hr-employees', fn() => $this->employeeRepository->getEmployees());
         $archived = $this->employeeRepository->getDeletedEmployees();
 
         // All distinct positions from the FULL active list
