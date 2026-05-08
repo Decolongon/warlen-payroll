@@ -22,12 +22,12 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
-    build: {
-        // Ensure assets are built to public/build
-        outDir: 'public/build',
-        manifest: true,
-        rollupOptions: {
-            input: 'resources/js/app.tsx'
-        }
-    }
+    // build: {
+    //     // Ensure assets are built to public/build
+    //     outDir: 'public/build',
+    //     manifest: true,
+    //     rollupOptions: {
+    //         input: 'resources/js/app.tsx'
+    //     }
+    // }
 });
