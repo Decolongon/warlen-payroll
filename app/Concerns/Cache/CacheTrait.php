@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Cache;
 
 trait CacheTrait
 {
-    protected function cacheRemember(string $key,  int $ttl = 60, callable $callback)
+    protected function cacheRemember(string $key, callable $callback, int $ttl = 60)
     {
         return Cache::remember($key, $ttl, $callback);
     }
