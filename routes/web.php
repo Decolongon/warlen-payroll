@@ -39,28 +39,31 @@ use Inertia\Inertia;
 
 
 Route::get('/', function () {
+    if (app()->isProduction()) {
+        Inertia::clearHistory();
+    }
     return Inertia::render('auth/login');
 })->name('home')->middleware(HomeMiddleware::class);
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
-Route::middleware(['auth', 'admin', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class.':100'])->group(function () {
+Route::middleware(['auth', 'admin', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class . ':100'])->group(function () {
 
-	Route::get('payroll', function () {
-		return Inertia::render('payroll/index');
-	});
+    Route::get('payroll', function () {
+        return Inertia::render('payroll/index');
+    });
 
-     // Admin payroll email routes
+    // Admin payroll email routes
     Route::post('/payrolls/{payroll}/email', [PayrollController::class, 'emailPayroll'])->name('payrolls.email');
     Route::post('/payrolls/bulk-email', [PayrollController::class, 'bulkEmail'])->name('payrolls.bulk-email');
 
-	Route::post('/employees/bulk-assign-position', [EmployeeController::class, 'bulkAssignPosition'])->name('employees.bulk-assign-position');
-	Route::post('/employees/bulk-assign-branch-site', [EmployeeController::class, 'bulkAssignBranchSite'])->name('employees.bulk-assign-branch-site');
-	Route::delete('/employees/bulk-destroy', [EmployeeController::class, 'bulkDestroy']);
-	Route::put('/employees/bulk-restore', [EmployeeController::class, 'bulkRestore']);
-	Route::delete('/employees/bulk-force-delete', [EmployeeController::class, 'bulkForceDelete']);
-	Route::put('/employees/{employee:slug_emp}/restore', [EmployeeController::class, 'restore'])->name('employees.restore')->withTrashed();
-	Route::get('/payrolls/{id}/print-data', [PayrollController::class, 'getPrintData'])->name('payrolls.print-data');
-	Route::get('/payrolls/export-all', [PayrollController::class, 'exportAll']); // ← before
+    Route::post('/employees/bulk-assign-position', [EmployeeController::class, 'bulkAssignPosition'])->name('employees.bulk-assign-position');
+    Route::post('/employees/bulk-assign-branch-site', [EmployeeController::class, 'bulkAssignBranchSite'])->name('employees.bulk-assign-branch-site');
+    Route::delete('/employees/bulk-destroy', [EmployeeController::class, 'bulkDestroy']);
+    Route::put('/employees/bulk-restore', [EmployeeController::class, 'bulkRestore']);
+    Route::delete('/employees/bulk-force-delete', [EmployeeController::class, 'bulkForceDelete']);
+    Route::put('/employees/{employee:slug_emp}/restore', [EmployeeController::class, 'restore'])->name('employees.restore')->withTrashed();
+    Route::get('/payrolls/{id}/print-data', [PayrollController::class, 'getPrintData'])->name('payrolls.print-data');
+    Route::get('/payrolls/export-all', [PayrollController::class, 'exportAll']); // ← before
 
     Route::post('/employees/bulk-assign-position', [EmployeeController::class, 'bulkAssignPosition'])->name('employees.bulk-assign-position');
     Route::post('/employees/bulk-assign-branch-site', [EmployeeController::class, 'bulkAssignBranchSite'])->name('employees.bulk-assign-branch-site');
@@ -109,7 +112,7 @@ Route::middleware(['auth', 'admin', 'auth.session', 'throttle:limit-actions', Ca
 });
 
 // ─── Employee routes ──────────────────────────────────────────────────────────
-Route::middleware(['auth', 'employee', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class.':100'])->group(function () {
+Route::middleware(['auth', 'employee', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class . ':100'])->group(function () {
 
     Route::get('employee/dashboard', [EmployeeDashboardController::class, 'index'])->name('employee.dashboard');
 
@@ -123,7 +126,7 @@ Route::middleware(['auth', 'employee', 'auth.session', 'throttle:limit-actions',
 });
 
 // ─── HR routes ────────────────────────────────────────────────────────────────
-Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class.':100'])->group(function () {
+Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class . ':100'])->group(function () {
 
     // HR employee bulk actions
     Route::delete('/hr/employees/bulk-destroy', [HREmployeeController::class, 'bulkDestroy']);
@@ -144,7 +147,7 @@ Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPe
     Route::post('/hr/attendance/import', [HRAttendanceImportController::class, 'store'])->name('hr.attendance.import');
 
 
-     // HR payroll email routes
+    // HR payroll email routes
     Route::post('/hr/payrolls/{payroll}/email', [HrPayrollController::class, 'emailPayroll'])->name('hr.payroll.email');
     Route::post('/hr/payrolls/bulk-email', [HrPayrollController::class, 'bulkEmail'])->name('hr.payroll.bulk-email');
 
@@ -250,7 +253,7 @@ Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPe
 });
 
 // ─── AI routes (admin) ────────────────────────────────────────────────────────
-Route::middleware(['auth', 'admin', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class.':100'])->prefix('ai')->group(function () {
+Route::middleware(['auth', 'admin', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class . ':100'])->prefix('ai')->group(function () {
     Route::get('/dashboard', [AIInsightController::class, 'dashboard']);
     Route::get('/insights', [AIInsightController::class, 'getInsights']);
     Route::post('/generate-insights', [AIInsightController::class, 'generateInsights']);
@@ -259,7 +262,7 @@ Route::middleware(['auth', 'admin', 'auth.session', 'throttle:limit-actions', Ca
 });
 
 // ─── AI routes (HR) ───────────────────────────────────────────────────────────
-Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class.':100'])->prefix('ai/hr')->group(function () {
+Route::middleware(['auth', 'hr', 'auth.session', 'throttle:limit-actions', CapPerpageMiddleware::class . ':100'])->prefix('ai/hr')->group(function () {
     Route::get('/dashboard', [HRAIInsightController::class, 'dashboard']);
     Route::get('/insights', [HRAIInsightController::class, 'getInsights']);
     Route::post('/generate-insights', [HRAIInsightController::class, 'generateInsights']);
