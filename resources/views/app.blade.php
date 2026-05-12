@@ -48,19 +48,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @routes
-    @production
         @vite('resources/js/app.tsx')
-    @else
-        @viteReactRefresh
-        @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
-    @endproduction
+        {{-- @viteReactRefresh
+        @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"]) --}}
     @inertiaHead
 </head>
 
 <body class="font-sans antialiased">
     @inertia
 
-    <script>
+    {{-- <script>
         // Disable developer tools (F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U, right-click)
         (function() {
             // Helper to prevent default action
@@ -99,7 +96,7 @@
                 prevent(e);
             });
         })();
-    </script>
+    </script> --}}
 </body>
 
 </html>

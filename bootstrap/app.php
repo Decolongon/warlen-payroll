@@ -34,10 +34,8 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            EncryptHistory::class,
         ]);
-        if (env('APP_ENV') === 'production') {
-            $middleware->web(append: [EncryptHistory::class]);
-        }
     })
 
     //   ->withSchedule(function (Schedule $schedule) {

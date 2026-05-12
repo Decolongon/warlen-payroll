@@ -39,7 +39,7 @@ use Inertia\Inertia;
 
 
 Route::get('/', function () {
-    if (app()->isProduction()) {
+    if (env('APP_ENV') === 'production') {
         Inertia::clearHistory();
     }
     return Inertia::render('auth/login');
