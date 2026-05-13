@@ -79,7 +79,7 @@ class Employee extends Model
         'pagibig_number' => 'encrypted',
         'philhealth_number' => 'encrypted',
         'skills' => 'array',
-        'duration' => 'date',
+        'duration' => 'integer',
         'dob' => 'date',
         'age' => 'integer',
     ];
