@@ -211,7 +211,6 @@ class EmployeeController extends Controller
         }
 
         $this->invalidateUserSessions($employee->user_id);
-        $employee->update(['employee_status' => 'inactive']);
         $employee->delete();
 
         $this->cacheForget('employees');
@@ -234,7 +233,6 @@ class EmployeeController extends Controller
         DB::transaction(function () use ($ids) {
             Employee::whereIn('id', $ids)->each(function ($employee) {
                 $this->invalidateUserSessions($employee->user_id);
-                $employee->update(['employee_status' => 'inactive']);
                 $employee->delete(); // soft delete
             });
         });
@@ -257,7 +255,6 @@ class EmployeeController extends Controller
         }
 
         Employee::withTrashed()->whereIn('id', $ids)->each(function ($employee) {
-            $employee->update(['employee_status' => 'active']);
             $employee->restore();
         });
 
@@ -273,7 +270,7 @@ class EmployeeController extends Controller
             return back()->with('error', 'Too many attempts. Please try again later.');
         }
 
-        $employee->update(['employee_status' => 'active']);
+       
         $employee->restore();
 
         $this->cacheForget('employees');
