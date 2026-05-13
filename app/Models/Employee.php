@@ -54,6 +54,19 @@ class Employee extends Model
         'emergency_contact_number',
         'pay_frequency',
         'employee_status',
+        'contact_person',
+        'contact_person_number',
+        'skills',
+        'age',
+        'gender',
+        'dob',
+        'mother_name',
+        'father_name',
+        'educ_attainment',
+        'certificate',
+        'permanent_address',
+        'present_address',
+        'duration',
     ];
 
     protected $casts = [
@@ -65,6 +78,10 @@ class Employee extends Model
         'sss_number' => 'encrypted',
         'pagibig_number' => 'encrypted',
         'philhealth_number' => 'encrypted',
+        'skills' => 'array',
+        'duration' => 'date',
+        'dob' => 'date',
+        'age' => 'integer',
     ];
 
 
@@ -72,16 +89,11 @@ class Employee extends Model
     {
         return LogOptions::defaults()
             ->logOnly([
-                // 'position_id',
-                // 'branch_id',
-                // 'user_id',
-                // 'site_id',
                 'position.pos_name',
                 'branch.branch_name',
                 'site.site_name',
                 'user.name',
                 'user.email',
-                //'slug_emp',
                 'emp_code',
                 'employee_number',
                 'contract_start_date',
@@ -92,6 +104,22 @@ class Employee extends Model
                 'emergency_contact_number',
                 'pay_frequency',
                 'employee_status',
+                'present_address',
+                'duration',
+                // ----- add these -----
+                'slug_emp',
+                'avatar',
+                'contact_person',
+                'contact_person_number',
+                'skills',
+                'age',
+                'gender',
+                'dob',
+                'mother_name',
+                'father_name',
+                'educ_attainment',
+                'certificate',
+                'permanent_address',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
@@ -110,17 +138,32 @@ class Employee extends Model
             'site.site_name' => 'Site',
             'user.name' => 'Employee Name',
             'user.email' => 'Email',
-            //'slug_emp' => 'Employee Slug',
             'emp_code' => 'Employee Code',
             'employee_number' => 'Employee Number',
             'contract_start_date' => 'Contract Start Date',
             'contract_end_date' => 'Contract End Date',
             'sss_number' => 'SSS Number',
             'pagibig_number' => 'Pag-Ibig Membership ID',
-            'philhealth' => 'PhilHealth Identification Number',
+            'philhealth_number' => 'PhilHealth Identification Number', // fixed key
             'emergency_contact_number' => 'Emergency Contact Number',
             'pay_frequency' => 'Pay Frequency',
             'employee_status' => 'Employee Status',
+            // ----- add these -----
+            'present_address' => 'Present Address',
+            'duration' => 'Duration',
+            'slug_emp' => 'Employee Slug',
+            'avatar' => 'Avatar',
+            'contact_person' => 'Contact Person',
+            'contact_person_number' => 'Contact Person Number',
+            'skills' => 'Skills',
+            'age' => 'Age',
+            'gender' => 'Gender',
+            'dob' => 'Date of Birth',
+            'mother_name' => "Mother's Name",
+            'father_name' => "Father's Name",
+            'educ_attainment' => 'Educational Attainment',
+            'certificate' => 'Certificate',
+            'permanent_address' => 'Permanent Address',
         ];
     }
 
@@ -250,6 +293,70 @@ class Employee extends Model
         return Attribute::make(
             // get: fn($value) => preg_replace('/[^a-zA-Z0-9\s]/', '-', Str::title($value)),
             set: fn($value) => strtolower(trim(strip_tags($value))),
+        );
+    }
+
+    // Contact person number
+    protected function contactPersonNumber(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
+        );
+    }
+
+    // Gender
+    protected function gender(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
+        );
+    }
+
+    // Mother's name
+    protected function motherName(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
+        );
+    }
+
+    // Father's name
+    protected function fatherName(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
+        );
+    }
+
+    // Educational attainment
+    protected function educAttainment(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
+        );
+    }
+
+    // Certificate (filename or description)
+    protected function certificate(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
+        );
+    }
+
+    // Permanent address
+    protected function permanentAddress(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
+        );
+    }
+
+    // Present address
+    protected function presentAddress(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => trim(strip_tags($value)),
         );
     }
 

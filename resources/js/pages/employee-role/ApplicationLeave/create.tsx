@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -304,7 +304,7 @@ export default function Create() {
                                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                         <button
                                             type="button"
-                                            onClick={() => window.history.back()}
+                                            onClick={() => router.get('/employee/application-leave')}
                                             disabled={processing}
                                             className="h-9 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition-all
                                                 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"

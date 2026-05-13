@@ -23,7 +23,7 @@ class ContributionVersionController extends Controller
     {
         Gate::authorize('viewAny', ContributionVersion::class);
 
-        $contributions = $this->cacheRemember('contribution_versions', 60, function () {
+        $contributions = $this->cacheRemember('contribution_versions', function () {
             return ContributionVersion::with([
                 'contributionBrackets' => fn($query) => $query->getContributionBrackets()
             ])->get();

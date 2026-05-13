@@ -11,6 +11,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
+use Carbon\Carbon;
 
 class EmployeeSeeder extends Seeder
 {
@@ -44,7 +45,7 @@ class EmployeeSeeder extends Seeder
     private function generatePagibigNumber(): string
     {
         do {
-            $number = str_pad(rand(0, 999999999999), 12, '0', STR_PAD_LEFT);
+            $number = str_pad(rand(0, 9999999999), 12, '0', STR_PAD_LEFT);
         } while (Employee::where('pagibig_number', $number)->exists());
 
         return $number;
@@ -56,14 +57,14 @@ class EmployeeSeeder extends Seeder
     private function generatePhilhealthNumber(): string
     {
         do {
-            $number = str_pad(rand(0, 999999999999), 12, '0', STR_PAD_LEFT);
+            $number = str_pad(rand(0, 9999999999), 12, '0', STR_PAD_LEFT);
         } while (Employee::where('philhealth_number', $number)->exists());
 
         return $number;
     }
 
     /**
-     * Create or get branch
+     * Get or create branch (Bacolod branch)
      */
     private function getBranch(): Branch
     {
@@ -77,36 +78,126 @@ class EmployeeSeeder extends Seeder
     }
 
     /**
-     * Create or get position
+     * Get or create a position by name
      */
-    private function getPosition(): Position
+    private function getOrCreatePosition(string $posName): Position
     {
+        if (empty($posName)) {
+            $posName = 'Regular employee';
+        }
         return Position::firstOrCreate(
-            ['pos_name' => 'Regular employee'],
+            ['pos_name' => $posName],
             [
-                'pos_slug' => Str::slug('Regular employee'),
+                'pos_slug' => Str::slug($posName),
                 'basic_salary' => 550
             ]
         );
     }
 
     /**
-     * Create or get site
+     * Get or create a site by name under the given branch
      */
-    private function getSite(Branch $branch): Site
+    private function getOrCreateSite(string $siteName, Branch $branch): Site
     {
+        if (empty($siteName)) {
+            $siteName = 'Default Site';
+        }
         return Site::firstOrCreate(
-            ['site_name' => 'UPHD', 'branch_id' => $branch->id],
+            ['site_name' => $siteName, 'branch_id' => $branch->id],
             ['branch_id' => $branch->id]
         );
     }
 
     /**
-     * Get all users data
+     * Parse the embedded tab‑separated raw data into an array of employee records.
+     * Each record contains user data (name, email, etc.) and employee attributes.
+     */
+    private function parseEmployeeData(): array
+    {
+        // The raw data as a heredoc – copy the entire table from your spreadsheet
+        // (I've included a small sample; replace with your full data)
+        $rawData = <<<RAW
+#	START DATE	DURATION	ID Number	NAME	MIDDLE NAME	STATUS	PROJECT SITE	SEX	POSITION	PERMANENT ADDRESS	PRESENT ADDRESS	NUMBER	DATE OF BIRTH	AGE	EMAIL ADDRESS	CONTACT PERSON	CONTACT NUMBER	ADDRESS OF CONTACT PERSON	MOTHERS NAME	FATHERS NAME	PLANTILLA	ASSIGNMENT	SSS#	PHILHEALTH	PAG-IBIG	TIN	DATE END	EDUCATIONAL ATTAINTMENT	CERTIFICATES	SKILLS
+1	03/13/2014	12 Years, 2 Months, 0 Days	133	Masgong, Jason	Fernando	Active	Fabrication-Bacolod	M	Welder	Villa Esperanza Tangub Bacolod City	Villa Esperanza Tangub Bacolod City	9109881355	10/09/1988	37 Years, 7 Months, 4 Days					Elna Masgong	Crispolo Masgong	Bacolod	LBC IloIlo		11-050663051-7	9140-6903-1211			TESDA RTC Shield Metal Arc Welding			
+2	12/25/2015	10 Years, 4 Months, 18 Days	18	Ruel Herminanda	Infane	Active	Megaworld Belmont-Iloilo	M	Fabrication	Prk. Crossing 8 Brgy. Tangub Bacolod CIty	Prk. Crossing 8 Brgy. Tangub Bacolod CIty		01/31/1985	41 Years, 3 Months, 12 Days		Richard Herminanda	9494889410	Prk Crosing 8 Tangub Bacolod City	Mercedita Herminanda	Romeo Herminanda	Bacolod	Bacolod	00-07-2328659-6	11-050539504-2		947-495-323		Computer Technicin IT (Undergraduate)			
+3	5/6/2019	7 Years, 0 Months, 7 Days	135	Matta, Michael Andrew	Adrao	Active	Phil Arforce-Cebu	M	Electrician	Brgy. Tiza Roxas City Capiz	Brgy. Tiza Roxas City Capiz	0946-629-5455	2/23/1996	30 Years, 2 Months, 20 Days					Maria Matta	Ireneo Matta	Bacolod	Crimson		11-025617573-8	1212-6087-0833						
+RAW;
+        // IMPORTANT: Replace the sample data above with your full dataset (all rows)
+        // The seeder will parse every row.
+
+        $lines = explode("\n", $rawData);
+        if (count($lines) < 2) {
+            return [];
+        }
+
+        $header = str_getcsv(array_shift($lines), "\t");
+        // Normalize header keys (lowercase, trim)
+        $header = array_map(function($col) {
+            return strtolower(trim($col));
+        }, $header);
+
+        $employees = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') continue;
+
+            $row = str_getcsv($line, "\t");
+            // Ensure row has enough columns
+            if (count($row) < count($header)) continue;
+
+            $data = array_combine($header, $row);
+
+            $name = trim($data['name'] ?? '');
+            if (empty($name)) continue;
+
+            $email = !empty($data['email address']) ? trim($data['email address']) : null;
+            if (!$email) {
+                // Generate a simple email from the name (remove commas, replace spaces with dots)
+                $emailName = strtolower(str_replace([' ', ','], ['.', ''], $name));
+                $email = $emailName . '@example.com';
+            }
+
+            // Prepare employee attributes
+            $employees[] = [
+                'name'                  => $name,
+                'email'                 => $email,
+                'emp_code'              => !empty($data['id number']) ? (int) $data['id number'] : null,
+                'duration'              => $data['duration'] ?? null,
+                'employee_status'       => strtolower($data['status'] ?? 'active'),
+                'gender'                => $data['sex'] ?? null,
+                'position_name'         => $data['position'] ?? null,
+                'permanent_address'     => $data['permanent address'] ?? null,
+                'present_address'       => $data['present address'] ?? null,
+                'contact_number'        => $data['number'] ?? null,
+                'dob'                   => !empty($data['date of birth']) ? Carbon::parse($data['date of birth'])->format('Y-m-d') : null,
+                'age'                   => !empty($data['age']) ? trim($data['age']) : null,
+                'contact_person'        => $data['contact person'] ?? null,
+                'contact_person_number' => $data['contact number'] ?? null,
+                'mother_name'           => $data['mothers name'] ?? null,
+                'father_name'           => $data['fathers name'] ?? null,
+                'sss_number'            => $data['sss#'] ?? null,
+                'philhealth_number'     => $data['philhealth'] ?? null,
+                'pagibig_number'        => $data['pag-ibig'] ?? null,
+                'contract_end_date'     => !empty($data['date end']) ? Carbon::parse($data['date end'])->format('Y-m-d') : null,
+                'educ_attainment'       => $data['educational atainment'] ?? $data['educational attaintment'] ?? null,
+                'certificate'           => $data['certificates'] ?? null,
+                'skills'                => $data['skills'] ?? null,
+                'site_name'             => $data['project site'] ?? null,
+                'tin_number'            => $data['tin'] ?? null,
+            ];
+        }
+
+        return $employees;
+    }
+
+    /**
+     * Get all users data (static admin/HR + dynamic employees from spreadsheet)
      */
     private function getUsersData(): array
     {
-        return [
+        // ========== STATIC ADMIN / HR USERS (KEEP AS IS) ==========
+        $staticUsers = [
             // Admin Users
             ['name' => 'Warlito', 'email' => 'warlito@gmail.com', 'emp_id' => 1000, 'role' => 'admin'],
             ['name' => 'Elena', 'email' => 'elena@gmail.com', 'emp_id' => 1001, 'role' => 'admin'],
@@ -114,46 +205,28 @@ class EmployeeSeeder extends Seeder
             // HR User
             ['name' => 'Jona', 'email' => 'jona@gmail.com', 'emp_id' => 2222, 'role' => 'hr_head'],
             ['name' => 'Rica', 'email' => 'rica@gmail.com', 'emp_id' => 3333, 'role' => 'hr_head'],
-            
-            // from uphd
-            ['name' => 'Jolisa', 'email' => 'jolisa@example.com', 'emp_id' => 1100, 'role' => 'employee'],
-            ['name' => 'John Eric Dumala', 'email' => 'john.eric@example.com', 'emp_id' => 244, 'role' => 'employee'],
-            ['name' => 'Arman', 'email' => 'arman@example.com', 'emp_id' => 1080, 'role' => 'employee'],
-            ['name' => 'Lloyd', 'email' => 'lloyd@example.com', 'emp_id' => 1077, 'role' => 'employee'],
-            ['name' => 'Allan', 'email' => 'allan@example.com', 'emp_id' => 1079, 'role' => 'employee'],
-            ['name' => 'Marlon', 'email' => 'marlon@example.com', 'emp_id' => 1031, 'role' => 'employee'],
-            ['name' => 'Joven', 'email' => 'joven@example.com', 'emp_id' => 1028, 'role' => 'employee'],
-            ['name' => 'Francis', 'email' => 'francis@example.com', 'emp_id' => 309, 'role' => 'employee'],
-            ['name' => 'Ana', 'email' => 'ana@example.com', 'emp_id' => 670, 'role' => 'employee'],
-            ['name' => 'Rey', 'email' => 'rey@example.com', 'emp_id' => 1211, 'role' => 'employee'],
-            ['name' => 'Jonas', 'email' => 'jonas@example.com', 'emp_id' => 1082, 'role' => 'employee'],
-            ['name' => 'Eugenio', 'email' => 'eugenio@example.com', 'emp_id' => 1209, 'role' => 'employee'],
-            ['name' => 'Ferdinand', 'email' => 'ferdinand@example.com', 'emp_id' => 1210, 'role' => 'employee'],
-            ['name' => 'Jury', 'email' => 'jury@example.com', 'emp_id' => 1174, 'role' => 'employee'],
-            ['name' => 'Ruth', 'email' => 'ruth@example.com', 'emp_id' => 1234, 'role' => 'employee'],
-            ['name' => 'Ryan', 'email' => 'ryan@example.com', 'emp_id' => 1212, 'role' => 'employee'],
-            ['name' => 'Aubrey', 'email' => 'aubrey@example.com', 'emp_id' => 1047, 'role' => 'employee'],
-            ['name' => 'Arnel', 'email' => 'arnel@example.com', 'emp_id' => 787, 'role' => 'employee'],
-            ['name' => 'Christoval', 'email' => 'christoval@example.com', 'emp_id' => 1297, 'role' => 'employee'],
-            ['name' => 'Philippe', 'email' => 'philippe@example.com', 'emp_id' => 1120, 'role' => 'employee'],
-            ['name' => 'Harold', 'email' => 'harold@example.com', 'emp_id' => 789, 'role' => 'employee'],
-            
-            // from ridge
-            ['name' => 'AllanB', 'email' => 'allanb@example.com', 'emp_id' => 1444, 'role' => 'employee'],
-            ['name' => 'BenedictoG', 'email' => 'benedictog@example.com', 'emp_id' => 1333, 'role' => 'employee'],
-            ['name' => 'ErenioC', 'email' => 'erenioc@example.com', 'emp_id' => 1222, 'role' => 'employee'],
-            ['name' => 'RyanJayT', 'email' => 'ryanjayt@example.com', 'emp_id' => 1111, 'role' => 'employee'],
-            ['name' => 'DanteM', 'email' => 'dantem@example.com', 'emp_id' => 1191, 'role' => 'employee'],
-            ['name' => 'EdwinJ', 'email' => 'edwinj@example.com', 'emp_id' => 1262, 'role' => 'employee'],
-            ['name' => 'PauloJ', 'email' => 'pauloj@example.com', 'emp_id' => 1269, 'role' => 'employee'],
-            ['name' => 'JohRobertL', 'email' => 'johrobertl@example.com', 'emp_id' => 1266, 'role' => 'employee'],
-            ['name' => 'RichardG', 'email' => 'richardg@example.com', 'emp_id' => 1284, 'role' => 'employee'],
-            ['name' => 'DaniloG', 'email' => 'danilog@example.com', 'emp_id' => 1034, 'role' => 'employee'],
-            ['name' => 'JoebertD', 'email' => 'joebertd@example.com', 'emp_id' => 857, 'role' => 'employee'],
-            ['name' => 'JuluwieV', 'email' => 'juluwiev@example.com', 'emp_id' => 754, 'role' => 'employee'],
-            ['name' => 'LhenieJaneS', 'email' => 'lheniejanes@example.com', 'emp_id' => 1272, 'role' => 'employee'],
-            ['name' => 'IrishSandraB', 'email' => 'irishsandrab@example.com', 'emp_id' => 1264, 'role' => 'employee'],
         ];
+        
+        // ========== OLD HARDCODED EMPLOYEE ENTRIES (COMMENTED OUT) ==========
+        // ... (all old employee entries are removed / commented)
+        
+        // ========== DYNAMIC EMPLOYEE DATA FROM SPREADSHEET ==========
+        $spreadsheetEmployees = $this->parseEmployeeData();
+        
+        $dynamicUsers = [];
+        foreach ($spreadsheetEmployees as $emp) {
+            $dynamicUsers[] = [
+                'name'     => $emp['name'],
+                'email'    => $emp['email'],
+                'emp_id'   => $emp['emp_code'],
+                'role'     => 'employee',
+                // Store additional employee data temporarily to use when creating Employee record
+                'employee_attrs' => $emp,
+            ];
+        }
+        
+        // Merge static admins/HR with dynamic employees
+        return array_merge($staticUsers, $dynamicUsers);
     }
 
     /**
@@ -180,35 +253,51 @@ class EmployeeSeeder extends Seeder
     }
 
     /**
-     * Create employee record (exclude only admin users)
+     * Create employee record (exclude admin users)
      */
-    private function createEmployeeRecord(Position $position, User $user, Branch $branch, int $empId, ?Site $site = null): void
+    private function createEmployeeRecord(Position $position, User $user, Branch $branch, int $empId, ?Site $site = null, array $extraAttrs = []): void
     {
-        // Only skip if user is admin - HR and employees will get employee records
+        // Skip if user is admin
         if ($user->hasRole('admin')) {
             $this->command->info("Skipping employee record for admin: {$user->name} ({$user->email})");
             return;
         }
         
+        // Prepare employee data
+        $employeeData = [
+            'position_id'               => $position->id,
+            'branch_id'                 => $branch->id,
+            'user_id'                   => $user->id,
+            'site_id'                   => $site?->id,
+            'slug_emp'                  => Str::slug($user->name . '-' . $empId),
+            'emp_code'                  => $empId,
+            'employee_number'           => $this->generateEmployeeNumber(),
+            'sss_number'                => $extraAttrs['sss_number'] ?? $this->generateSssNumber(),
+            'pagibig_number'            => $extraAttrs['pagibig_number'] ?? $this->generatePagibigNumber(),
+            'philhealth_number'         => $extraAttrs['philhealth_number'] ?? $this->generatePhilhealthNumber(),
+            'contract_start_date'       => now(),
+            'contract_end_date'         => $extraAttrs['contract_end_date'] ?? now()->addYear(),
+            'emergency_contact_number'  => $extraAttrs['contact_person_number'] ?? '09123456789',
+            'pay_frequency'             => 'weekender',
+            'employee_status'           => $extraAttrs['employee_status'] ?? 'active',
+            'contact_person'            => $extraAttrs['contact_person'] ?? null,
+            'contact_person_number'     => $extraAttrs['contact_person_number'] ?? null,
+            'skills'                    => $extraAttrs['skills'] ? explode(',', $extraAttrs['skills']) : null,
+            'age'                       => $extraAttrs['age'] ?? null,
+            'gender'                    => $extraAttrs['gender'] ?? null,
+            'dob'                       => $extraAttrs['dob'] ?? null,
+            'mother_name'               => $extraAttrs['mother_name'] ?? null,
+            'father_name'               => $extraAttrs['father_name'] ?? null,
+            'educ_attainment'           => $extraAttrs['educ_attainment'] ?? null,
+            'certificate'               => $extraAttrs['certificate'] ?? null,
+            'permanent_address'         => $extraAttrs['permanent_address'] ?? null,
+            'present_address'           => $extraAttrs['present_address'] ?? null,
+            'duration'                  => $extraAttrs['duration'] ?? null,
+        ];
+        
         Employee::firstOrCreate(
             ['user_id' => $user->id],
-            [
-                'position_id' => $position->id,
-                'branch_id' => $branch->id,
-                'user_id' => $user->id,
-                'site_id' => $site?->id,
-                'slug_emp' => Str::slug($user->name . '-' . $empId),
-                'emp_code' => $empId,
-                'employee_number' => $this->generateEmployeeNumber(),
-                'sss_number' => $this->generateSssNumber(),
-                'pagibig_number' => $this->generatePagibigNumber(),
-                'philhealth_number' => $this->generatePhilhealthNumber(),
-                'contract_start_date' => now(),
-                'contract_end_date' => now()->addYear(),
-                'emergency_contact_number' => '09123456789',
-                'pay_frequency' => 'weekender',
-                'employee_status' => 'active',
-            ]
+            $employeeData
         );
     }
 
@@ -227,7 +316,6 @@ class EmployeeSeeder extends Seeder
         $this->command->info("Total employee records: " . Employee::count());
         $this->command->info('========================================');
         
-        // List users by role
         $this->command->info("\nAdmin Users (No employee records):");
         foreach (User::role('admin')->get() as $admin) {
             $employeeRecord = Employee::where('user_id', $admin->id)->first();
@@ -247,17 +335,6 @@ class EmployeeSeeder extends Seeder
             $employeeRecord = Employee::where('user_id', $employee->id)->first();
             $hasEmployeeRecord = $employeeRecord ? '✓' : '✗';
             $this->command->info("  - {$employee->name} ({$employee->email}) - Employee Record: {$hasEmployeeRecord}");
-        }
-        
-        // Show only admins that were skipped
-        $this->command->info("\nSkipped Users (Admins only):");
-        $admins = User::role('admin')->get();
-        if ($admins->count() > 0) {
-            foreach ($admins as $admin) {
-                $this->command->info("  - {$admin->name} ({$admin->email}) - Admin (No employee record created)");
-            }
-        } else {
-            $this->command->info("  No admin users found");
         }
     }
 
@@ -279,15 +356,14 @@ class EmployeeSeeder extends Seeder
             'employee' => $roles['employee'],
         ];
 
-        // Create branch, position, and site
+        // Create branch, default position, and default site
         $branch = $this->getBranch();
-        $position = $this->getPosition();
-        $site = $this->getSite($branch);
+        $defaultPosition = $this->getOrCreatePosition('Regular employee');
+        $defaultSite = $this->getOrCreateSite('Default Site', $branch);
 
         $usersData = $this->getUsersData();
         $totalUsers = count($usersData);
         
-        // Progress bar for creating users
         $this->command->info('Starting Employee Seeder...');
         $this->command->info("Total users to process: {$totalUsers}");
         $progressBar = $this->command->getOutput()->createProgressBar($totalUsers);
@@ -296,18 +372,37 @@ class EmployeeSeeder extends Seeder
         $processedUsers = [];
 
         foreach ($usersData as $data) {
+            // For employee rows from spreadsheet, we have extra attributes
+            $extraAttrs = $data['employee_attrs'] ?? [];
             $user = $this->getOrCreateUser($data, $roleMap);
-            $processedUsers[] = ['user' => $user, 'emp_id' => $data['emp_id'], 'role' => $data['role']];
+            
+            // Determine position and site from extraAttrs if available
+            $position = $defaultPosition;
+            $site = $defaultSite;
+            if (!empty($extraAttrs['position_name'])) {
+                $position = $this->getOrCreatePosition($extraAttrs['position_name']);
+            }
+            if (!empty($extraAttrs['site_name'])) {
+                $site = $this->getOrCreateSite($extraAttrs['site_name'], $branch);
+            }
+            
+            $processedUsers[] = [
+                'user' => $user,
+                'emp_id' => $data['emp_id'],
+                'role' => $data['role'],
+                'position' => $position,
+                'site' => $site,
+                'extra_attrs' => $extraAttrs,
+            ];
             $progressBar->advance();
         }
         
         $progressBar->finish();
         $this->command->newLine(2);
         
-        // Create employee records (exclude only admin users)
+        // Create employee records (exclude admin users)
         $this->command->info('Creating employee records (excluding admin users)...');
         
-        // Count non-admin users for progress bar
         $nonAdminUsers = array_filter($processedUsers, function($item) {
             return $item['role'] !== 'admin';
         });
@@ -319,7 +414,14 @@ class EmployeeSeeder extends Seeder
         $employeeProgressBar->start();
 
         foreach ($processedUsers as $item) {
-            $this->createEmployeeRecord($position, $item['user'], $branch, $item['emp_id'], $site);
+            $this->createEmployeeRecord(
+                $item['position'],
+                $item['user'],
+                $branch,
+                $item['emp_id'],
+                $item['site'],
+                $item['extra_attrs']
+            );
             if ($item['role'] !== 'admin') {
                 $employeeProgressBar->advance();
             }

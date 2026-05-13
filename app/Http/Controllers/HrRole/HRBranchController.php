@@ -27,7 +27,7 @@ class HRBranchController extends Controller
      */
     public function index(Request $request)
     {
-        $branches = $this->cacheRemember('branches', 60, function () {
+        $branches = $this->cacheRemember('branches', function () {
             return $this->branchRepository->getBranches();
         });
 

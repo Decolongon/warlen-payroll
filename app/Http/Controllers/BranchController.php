@@ -29,7 +29,7 @@ class BranchController extends Controller
 	{
 		Gate::authorize('viewAny', Branch::class);
 
-		$branches = $this->cacheRemember('branches', 60, function () {
+		$branches = $this->cacheRemember('branches', function () {
 			return $this->branchRepository->getBranchesWithSitesAndEmployees();
 		});
 

@@ -23,8 +23,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
-        $middleware->trustProxies(at:'*');
-
         $middleware->alias([
             'roleBase' => \App\Http\Middleware\RolaBaseMiddleware::class,
             'admin' => AdminMiddleware::class,
@@ -36,7 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
-            // EncryptHistory::class,
+            EncryptHistory::class,
         ]);
     })
 
