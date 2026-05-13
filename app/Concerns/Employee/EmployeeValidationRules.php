@@ -14,11 +14,25 @@ trait EmployeeValidationRules
      *
      * @return array
      */
-    protected function empRules(): array
+        protected function empRules(): array
     {
         return [
             'emergency_contact_number' => [
                 'required',
+                'string',
+                'min:11',
+                'regex:/^(\+63|0)?9\d{9}$/'
+            ],
+
+            'contact_person' => [
+                'nullable',
+                'string',
+                'max:100',
+                'regex:/^[a-zA-Z\s\'-]+$/'
+            ],
+
+            'contact_person_number' => [
+                'nullable',
                 'string',
                 'min:11',
                 'regex:/^(\+63|0)?9\d{9}$/'
@@ -38,15 +52,11 @@ trait EmployeeValidationRules
                 'max:80',
                 Rule::unique('users', 'email')->ignore($this->route('employee')?->user_id)
             ],
+            
             'password' => [
                 'nullable',
                 'string',
                 Password::default()
-                //'regex:/^[^\p{Emoji}]*$/u',
-                // 'regex:/[A-Z]/',      // At least one uppercase letter
-                // 'regex:/[a-z]/',      // At least one lowercase letter
-                // 'regex:/[0-9]/',      // At least one number
-                // 'regex:/[@$!%*#?&]/', // At least one special character
             ],
 
             'employee_number' => [
@@ -59,9 +69,93 @@ trait EmployeeValidationRules
 
             'emp_code' => [
                 'required',
+                'integer',
                 Rule::unique('employees', 'emp_code')->ignore($this->route('employee')?->id),
             ],
 
+            // Personal Information
+            'age' => [
+                'nullable',
+                'integer',
+                'min:18',
+                'max:100'
+            ],
+
+            'gender' => [
+                'nullable',
+                'string',
+                Rule::in(['male', 'female'])
+            ],
+
+            'dob' => [
+                'nullable',
+                'date',
+                'before:today',
+                'after:1900-01-01'
+            ],
+
+            'mother_name' => [
+                'nullable',
+                'string',
+                'max:100',
+                'regex:/^[a-zA-Z\s\'-]+$/'
+            ],
+
+            'father_name' => [
+                'nullable',
+                'string',
+                'max:100',
+                'regex:/^[a-zA-Z\s\'-]+$/'
+            ],
+
+            'educ_attainment' => [
+                'nullable',
+                'string',
+                'max:100',
+                Rule::in([
+                    'Elementary Graduate',
+                    'High School Graduate',
+                    'Senior High School Graduate',
+                    'Vocational',
+                    'Associate Degree',
+                    "Bachelor's Degree",
+                    "Master's Degree",
+                    'Doctorate',
+                    'No Formal Education'
+                ])
+            ],
+
+            'certificate' => [
+                'nullable',
+                'string',
+                'max:255'
+            ],
+
+            'permanent_address' => [
+                'nullable',
+                'string',
+                'max:500'
+            ],
+
+            'present_address' => [
+                'nullable',
+                'string',
+                'max:500'
+            ],
+
+            'skills' => [
+                'nullable',
+                'array',
+                'max:20'
+            ],
+
+            'skills.*' => [
+                'string',
+                'max:50',
+                'distinct'
+            ],
+
+            // Contract Information
             'contract_start_date' => [
                 'required',
                 'date'
@@ -73,12 +167,19 @@ trait EmployeeValidationRules
                 'after_or_equal:contract_start_date'
             ],
 
-           'sss_number' => [
+            'duration' => [
+                'nullable',
+                'integer',
+                'min:1'
+            ],
+
+            // Government Numbers
+            'sss_number' => [
                 'required',
                 'string',
                 'max:15',
                 'regex:/^[\d\-]+$/',
-                new UniqueEncrypted( Employee::class, 'sss_number', $this->route('employee')?->id),
+                new UniqueEncrypted(Employee::class, 'sss_number', $this->route('employee')?->id),
             ],
 
             'pagibig_number' => [
@@ -86,7 +187,7 @@ trait EmployeeValidationRules
                 'string',
                 'max:15',
                 'regex:/^[\d\-]+$/',
-                new UniqueEncrypted( Employee::class, 'pagibig_number', $this->route('employee')?->id),
+                new UniqueEncrypted(Employee::class, 'pagibig_number', $this->route('employee')?->id),
             ],
 
             'philhealth_number' => [
@@ -94,10 +195,13 @@ trait EmployeeValidationRules
                 'string',
                 'max:15',
                 'regex:/^[\d\-]+$/',
-                new UniqueEncrypted( Employee::class, 'philhealth_number', $this->route('employee')?->id ),
+                new UniqueEncrypted(Employee::class, 'philhealth_number', $this->route('employee')?->id),
             ],
 
-            'employee_status' => ['required'],
+            'employee_status' => [
+                'required',
+                Rule::in(['active', 'end_of_contract', 'awol', 'terminated', 'resigned', 'newly_hired'])
+            ],
 
             'position_id' => [
                 'nullable',
@@ -109,7 +213,11 @@ trait EmployeeValidationRules
                 'required',
                 'exists:branches,id'
             ],
-            'pay_frequency' => ['required'],
+            
+            'pay_frequency' => [
+                'required',
+                Rule::in(['weekender', 'monthly', 'semi_monthly'])
+            ],
 
             'site_id' => [
                 'nullable',
@@ -120,29 +228,37 @@ trait EmployeeValidationRules
             ],
 
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+            'remove_avatar' => ['nullable', 'string', Rule::in(['true', 'false'])],
         ];
     }
 
     protected function empMessages(): array
     {
         return [
-            // Avatar Messsages
+            // Avatar Messages
             'avatar.image' => 'The avatar must be an image.',
             'avatar.mimes' => 'The avatar must be a valid image file (jpeg, png, jpg, gif, webp).',
             'avatar.max' => 'The avatar must not exceed 2MB in size.',
 
             // Emergency Contact Number Messages
             'emergency_contact_number.required' => 'The emergency contact number is required.',
-            'emergency_contact_number.numeric' => 'The emergency contact number must contain only numbers.',
             'emergency_contact_number.min' => 'The emergency contact number must be at least 11 digits.',
-            'emergency_contact_number.starts_with' => 'The emergency contact number must start with 9 (e.g., 91234567890).',
+            'emergency_contact_number.regex' => 'The emergency contact number must be a valid Philippine mobile number (e.g., 09123456789 or +639123456789).',
+
+            // Contact Person Messages
+            'contact_person.string' => 'The contact person name must be a valid string.',
+            'contact_person.max' => 'The contact person name cannot exceed 100 characters.',
+            'contact_person.regex' => 'The contact person name may only contain letters, spaces, apostrophes, and hyphens.',
+
+            'contact_person_number.min' => 'The contact person number must be at least 11 digits.',
+            'contact_person_number.regex' => 'The contact person number must be a valid Philippine mobile number.',
 
             // Name Messages
             'name.required' => 'The employee name is required.',
             'name.string' => 'The employee name must be a valid string.',
             'name.max' => 'The employee name cannot exceed 80 characters.',
             'name.min' => 'The employee name must be at least 3 characters.',
-            'name.regex' => 'The employee name may only contain letters, spaces, apostrophes, and hyphens. No numbers or special characters allowed.',
+            'name.regex' => 'The employee name may only contain letters, spaces, apostrophes, and hyphens.',
 
             // Email Messages
             'email.required' => 'The email address is required.',
@@ -151,35 +267,71 @@ trait EmployeeValidationRules
             'email.unique' => 'This email address is already registered.',
 
             // Password Messages
-            'password.min' => 'The password must be at least 8 characters long.',
-            'password.regex' => 'The password cannot contain emojis.',
-            'password.regex' => 'The password must contain at least one uppercase letter.',
-            'password.regex' => 'The password must contain at least one lowercase letter.',
-            'password.regex' => 'The password must contain at least one number.',
-            'password.regex' => 'The password must contain at least one special character (@$!%*#?&).',
+            'password.min' => 'The password must be at least :min characters.',
 
             // Employee Number Messages
-            'employee_number.required' => 'The employee contact number is required.',
-            'employee_number.numeric' => 'The employee contact number must contain only numbers.',
-            'employee_number.min' => 'The employee contact number must be at least 11 digits.',
-            'employee_number.regex' => 'The employee contact number must start with 9.',
-            'employee_number.unique' => 'This employee contact number is already taken.',
+            'employee_number.required' => 'The employee mobile number is required.',
+            'employee_number.min' => 'The employee mobile number must be at least 11 digits.',
+            'employee_number.regex' => 'The employee mobile number must be a valid Philippine mobile number.',
+            'employee_number.unique' => 'This employee mobile number is already registered.',
 
             // Employee Code Messages
             'emp_code.required' => 'The employee code is required.',
+            'emp_code.integer' => 'The employee code must be a number.',
             'emp_code.unique' => 'This employee code is already taken.',
 
-            // Contract Start Date Messages
+            // Personal Information Messages
+            'age.integer' => 'Age must be a valid number.',
+            'age.min' => 'Employee must be at least 18 years old.',
+            'age.max' => 'Age cannot exceed 100 years.',
+
+            'gender.in' => 'Gender must be either male or female.',
+
+            'dob.date' => 'Please enter a valid date of birth.',
+            'dob.before' => 'Date of birth must be before today.',
+            'dob.after' => 'Date of birth must be after 1900.',
+
+            'mother_name.regex' => 'Mother\'s name may only contain letters, spaces, apostrophes, and hyphens.',
+            'father_name.regex' => 'Father\'s name may only contain letters, spaces, apostrophes, and hyphens.',
+
+            'educ_attainment.in' => 'Please select a valid educational attainment level.',
+
+            'permanent_address.max' => 'Permanent address cannot exceed 500 characters.',
+            'present_address.max' => 'Present address cannot exceed 500 characters.',
+
+            'skills.array' => 'Skills must be provided as an array.',
+            'skills.max' => 'You cannot add more than 20 skills.',
+            'skills.*.string' => 'Each skill must be a valid text.',
+            'skills.*.max' => 'Each skill cannot exceed 50 characters.',
+            'skills.*.distinct' => 'Duplicate skills are not allowed.',
+
+            // Contract Information Messages
             'contract_start_date.required' => 'The contract start date is required.',
             'contract_start_date.date' => 'Please enter a valid contract start date.',
 
-            // Contract End Date Messages
             'contract_end_date.required' => 'The contract end date is required.',
             'contract_end_date.date' => 'Please enter a valid contract end date.',
             'contract_end_date.after_or_equal' => 'The contract end date must be after or equal to the start date.',
 
+            'duration.integer' => 'Duration must be a valid number.',
+            'duration.min' => 'Duration must be at least 1 day.',
+
+            // Government Numbers Messages
+            'sss_number.required' => 'The SSS number is required.',
+            'sss_number.max' => 'The SSS number cannot exceed 15 characters.',
+            'sss_number.regex' => 'The SSS number must contain only numbers and hyphens.',
+            
+            'pagibig_number.required' => 'The Pag-IBIG number is required.',
+            'pagibig_number.max' => 'The Pag-IBIG number cannot exceed 15 characters.',
+            'pagibig_number.regex' => 'The Pag-IBIG number must contain only numbers and hyphens.',
+            
+            'philhealth_number.required' => 'The PhilHealth number is required.',
+            'philhealth_number.max' => 'The PhilHealth number cannot exceed 15 characters.',
+            'philhealth_number.regex' => 'The PhilHealth number must contain only numbers and hyphens.',
+
             // Employee Status Messages
             'employee_status.required' => 'Please select an employee status.',
+            'employee_status.in' => 'Please select a valid employee status.',
 
             // Position ID Messages
             'position_id.exists' => 'The selected position does not exist.',
@@ -190,6 +342,7 @@ trait EmployeeValidationRules
 
             // Pay Frequency Messages
             'pay_frequency.required' => 'Please select a pay frequency.',
+            'pay_frequency.in' => 'Please select a valid pay frequency.',
 
             // Site ID Messages
             'site_id.exists' => 'The selected site does not exist.',

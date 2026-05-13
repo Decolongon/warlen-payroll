@@ -37,22 +37,40 @@ class UpdateEmployee
        // $user->assignRole($role);
 
         //dd($data['employee_status']);
+
+        $startDate = \Carbon\Carbon::parse($data['contract_start_date']);
+        $endDate = \Carbon\Carbon::parse($data['contract_end_date']);
+        $duration = $startDate->diffInDays($endDate);
+        
         $employee->update([
-            'position_id' => $data['position_id'],
-            'branch_id' => $data['branch_id'],
+            'position_id' => $data['position_id'] ?? null,
+            'branch_id' => $data['branch_id'] ?? null,
             'user_id' => $user->id,
-            'site_id' => $data['site_id'],
+            'site_id' => $data['site_id'] ?? null,
             'employee_number' => $data['employee_number'],
             'emp_code' => $data['emp_code'],
             'slug_emp' => Str::slug($data['name'] . ' ' . $data['emp_code']),
             'emergency_contact_number' => $data['emergency_contact_number'],
+            'contact_person' => $data['contact_person'] ?? null,
+            'contact_person_number' => $data['contact_person_number'] ?? null,
+            'skills' => isset($data['skills']) ? (is_array($data['skills']) ? json_encode($data['skills']) : $data['skills']) : null,
+            'age' => $data['age'] ?? null,
+            'gender' => $data['gender'] ?? 'male',
+            'dob' => $data['dob'] ?? null,
+            'mother_name' => $data['mother_name'] ?? null,
+            'father_name' => $data['father_name'] ?? null,
+            'educ_attainment' => $data['educ_attainment'] ?? null,
+            'certificate' => $data['certificate'] ?? null,
+            'permanent_address' => $data['permanent_address'] ?? null,
+            'present_address' => $data['present_address'] ?? null,
             'contract_start_date' => $data['contract_start_date'],
             'contract_end_date' => $data['contract_end_date'],
+            'duration' => $duration,
             'sss_number' => $data['sss_number'],
             'pagibig_number' => $data['pagibig_number'],
-            'philhealth_number' => $data['philhealth_number'], 
-            'pay_frequency' => $data['pay_frequency'],
-            'employee_status' => $data['employee_status'],
+            'philhealth_number' => $data['philhealth_number'],
+            'pay_frequency' => $data['pay_frequency'] ?? 'monthly',
+            'employee_status' => $data['employee_status'] ?? 'active',
         ]);
 
         // Handle avatar upload – store on Employee, not User

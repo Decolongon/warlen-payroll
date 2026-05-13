@@ -23,16 +23,29 @@ return new class extends Migration
             $table->foreignIdFor(Site::class,'site_id')->nullable()->constrained('sites')->cascadeOnUpdate()->nullOnDelete();
             $table->string('slug_emp')->unique();
             $table->string('employee_number')->unique();
-            $table->integer('emp_code')->unique()->index();
+            $table->integer('emp_code')->unique();
             $table->string('emergency_contact_number');
+            $table->string('contact_person')->nullable();
+            $table->string('contact_person_number')->nullable();
+            $table->json('skills')->nullable();
+            $table->integer('age')->nullable();
+            $table->enum('gender',['male', 'female'])->default('male');
+            $table->date('dob')->nullable();
+            $table->string('mother_name')->nullable();
+            $table->string('father_name')->nullable();
+            $table->string('educ_attainment')->nullable();
+            $table->string('certificate')->nullable();
+            $table->string('permanent_address')->nullable();
+            $table->string('present_address')->nullable();
             $table->date('contract_start_date');
             $table->date('contract_end_date');
+            $table->integer('duration')->nullable();
             $table->string('sss_number')->unique();
             $table->string('philhealth_number')->unique();
             $table->string('pagibig_number')->unique();
             $table->enum('pay_frequency',['weekender','monthly','semi_monthly'])->default('monthly');
-            $table->enum('employee_status',['active','inactive'])->default('active'); // base on  contract end date
-
+            $table->enum('employee_status',['active','end_of_contract', 'awol','terminated', 'resigned', 'newly_hired'])->default('active'); 
+            $table->index([ 'emp_code', 'employee_status']);
             $table->softDeletes();
         
             $table->timestamps();
