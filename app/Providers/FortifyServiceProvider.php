@@ -90,7 +90,7 @@ class FortifyServiceProvider extends ServiceProvider
                     }
 
                     if ($user->hasRole('employee')) {
-                        if ($user->employee && $user->employee->employee_status === 'active' && !$user->employee->deleted_at) {
+                        if ($user->employee && in_array($user->employee->employee_status, ['active', 'newly_hired'])  && !$user->employee->deleted_at) {
                             return redirect()->route('employee.dashboard');
                         }
                         Auth::logout();
@@ -103,7 +103,7 @@ class FortifyServiceProvider extends ServiceProvider
 
                     // Check if HR head exists and is active
                     if ($user->hasRole('hr_head')) {
-                        if ($user->employee && $user->employee->employee_status === 'active' && !$user->employee->deleted_at) {
+                        if ($user->employee && in_array($user->employee->employee_status, ['active', 'newly_hired'])  && !$user->employee->deleted_at) {
                             return redirect()->route('hr.dashboard');
                         }
 

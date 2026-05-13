@@ -18,8 +18,10 @@ class EmployeeLookupService
         if ($this->employees === null) {
             // Eager load the position relationship
             $this->employees = Employee::with(['user', 'position'])
-                ->where('employee_status', 'active')
-                ->whereNull('deleted_at')->get();
+                //->where('employee_status', 'active')
+                ->whereNotIn('employee_status', ['end_of_contract', 'awol', 'terminated', 'resigned'])
+                ->whereNull('deleted_at')
+                ->get();
 
             // Create a more flexible mapping
             foreach ($this->employees as $emp) {

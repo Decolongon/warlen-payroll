@@ -8,7 +8,7 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApplicationLeavePolicy
 {
-      use HandlesAuthorization;
+    use HandlesAuthorization;
     /**
      * Determine whether the user can view any models.
      */
@@ -20,7 +20,7 @@ class ApplicationLeavePolicy
 
         return $user->hasRole('employee')
             && $user->employee
-            && $user->employee->employee_status == 'Active' || 'active';
+            && in_array($user->employee->employee_status, ['active', 'newly_hired']) && !$user->employee->deleted_at;
     }
 
     /**
@@ -38,8 +38,8 @@ class ApplicationLeavePolicy
     {
         return $user->hasRole('employee')
             &&
-            $user->employee &&
-            $user->employee->employee_status == 'Active' || 'active';
+            $user->employee
+            && in_array($user->employee->employee_status, ['active', 'newly_hired']) && !$user->employee->deleted_at;
     }
 
     /**
