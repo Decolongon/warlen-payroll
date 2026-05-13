@@ -1,8 +1,23 @@
 import { Head, router } from '@inertiajs/react';
 import { useForm } from '@inertiajs/react';
-import { Search, ChevronDown, User, Briefcase, MapPin, Calendar, Phone, Mail, Hash, Clock, LoaderCircle, ImagePlus, PersonStanding, Shield, Eye, EyeOff } from 'lucide-react';
+import {
+    Search,
+    ChevronDown,
+    User,
+    Briefcase,
+    MapPin,
+    Calendar,
+    LoaderCircle,
+    PersonStanding,
+    Shield,
+    Eye,
+    EyeOff,
+    Home,
+    Users,
+    Plus,
+    X,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-// import { toast } from 'sonner';
 import { update } from '@/actions/App/Http/Controllers/EmployeeController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -44,7 +59,7 @@ interface DropdownProps {
     showAllResults?: boolean;
 }
 
-// Helper: format date for input
+// ---------- Helper functions ----------
 const formatDateForInput = (dateString: string | null | undefined) => {
     if (!dateString) return '';
     if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) return dateString;
@@ -57,18 +72,39 @@ const formatDateForInput = (dateString: string | null | undefined) => {
     }
 };
 
-// ── Helper: calculate status from dates ──────────────────────────────────────
-const getStatusFromDates = (start: string, end: string) => {
-    if (!start || !end) return 'Inactive';
+const computeAge = (dob: string): string => {
+    if (!dob) return '';
+    const birth = new Date(dob);
     const today = new Date();
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    today.setHours(0, 0, 0, 0);
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(0, 0, 0, 0);
-    return (today >= startDate && today <= endDate) ? 'Active' : 'Inactive';
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age >= 0 ? String(age) : '';
 };
 
+// Status label mapping (manual selection)
+const STATUS_LABEL: Record<string, string> = {
+    active: 'Active',
+    newly_hired: 'Newly Hired',
+    end_of_contract: 'End of Contract',
+    awol: 'AWOL',
+    terminated: 'Terminated',
+    resigned: 'Resigned',
+};
+
+const EDUC_ATTAINMENT_OPTIONS = [
+    'Elementary Graduate',
+    'High School Graduate',
+    'Senior High School Graduate',
+    'Vocational',
+    'Associate Degree',
+    "Bachelor's Degree",
+    "Master's Degree",
+    'Doctorate',
+    'No Formal Education',
+];
+
+// ---------- Reusable Components ----------
 function SearchableDropdown({
     label,
     items,
@@ -84,29 +120,40 @@ function SearchableDropdown({
     showAllResults = false,
 }: DropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const selectedItem = items.find(i => i.id.toString() === selectedId);
+    const selectedItem = items.find((i) => i.id.toString() === selectedId);
 
     return (
         <div className="space-y-2">
             <Label className="text-sm font-semibold">
-                {label} {required && <span className="text-accent">*</span>}
+                {label} {required && <span className="text-destructive">*</span>}
             </Label>
             <div className="relative">
                 <div
-                    className={`flex cursor-pointer items-center justify-between rounded-xl border-2 bg-background px-4 py-2.5 transition-all ${isOpen ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
-                        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`flex cursor-pointer items-center justify-between rounded-xl border-2 bg-background px-4 py-2.5 transition-all ${
+                        isOpen
+                            ? 'border-primary ring-2 ring-primary/20'
+                            : 'border-border hover:border-primary/50'
+                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                 >
-                    <span className={`text-sm ${!selectedItem ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    <span
+                        className={`text-sm ${
+                            !selectedItem ? 'text-muted-foreground' : 'text-foreground'
+                        }`}
+                    >
                         {selectedItem?.name || placeholder}
                     </span>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${
+                            isOpen ? 'rotate-180' : ''
+                        }`}
+                    />
                 </div>
 
                 {isOpen && !disabled && (
                     <>
                         <div className="absolute z-10 mt-2 w-full rounded-xl border border-border bg-card shadow-lg">
-                            <div className="p-2 border-b border-border">
+                            <div className="border-b border-border p-2">
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
@@ -124,7 +171,7 @@ function SearchableDropdown({
                                     items.map((item) => (
                                         <div
                                             key={item.id}
-                                            className="cursor-pointer rounded-lg px-3 py-2 text-sm hover:bg-muted transition-colors"
+                                            className="cursor-pointer rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted"
                                             onClick={() => {
                                                 onSelect(item.id.toString(), item.name);
                                                 setIsOpen(false);
@@ -134,19 +181,18 @@ function SearchableDropdown({
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="px-3 py-2 text-sm text-muted-foreground">No results found</div>
+                                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                                        No results found
+                                    </div>
                                 )}
                                 {!showAllResults && items.length === 5 && (
-                                    <div className="px-3 py-2 text-xs text-muted-foreground border-t mt-1 pt-2">
+                                    <div className="mt-1 border-t px-3 pb-2 pt-2 text-xs text-muted-foreground">
                                         Showing top 5 results. Use search to find more.
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <div
-                            className="fixed inset-0 z-0"
-                            onClick={() => setIsOpen(false)}
-                        />
+                        <div className="fixed inset-0 z-0" onClick={() => setIsOpen(false)} />
                     </>
                 )}
             </div>
@@ -155,68 +201,231 @@ function SearchableDropdown({
     );
 }
 
+function SkillsInput({
+    skills,
+    onChange,
+    error,
+}: {
+    skills: string[];
+    onChange: (skills: string[]) => void;
+    error?: string;
+}) {
+    const [input, setInput] = useState('');
+
+    const add = () => {
+        const trimmed = input.trim();
+        if (!trimmed || skills.includes(trimmed) || skills.length >= 20) return;
+        onChange([...skills, trimmed]);
+        setInput('');
+    };
+
+    const remove = (skill: string) => onChange(skills.filter((s) => s !== skill));
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <Label className="text-sm font-semibold">Skills</Label>
+            <div className="flex gap-2">
+                <Input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type a skill and press Enter or +"
+                    className="rounded-xl"
+                    maxLength={50}
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={add}
+                    disabled={!input.trim() || skills.length >= 20}
+                    className="shrink-0 rounded-xl"
+                >
+                    <Plus className="h-4 w-4" />
+                </Button>
+            </div>
+            {skills.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                    {skills.map((skill) => (
+                        <span
+                            key={skill}
+                            className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                        >
+                            {skill}
+                            <button
+                                type="button"
+                                onClick={() => remove(skill)}
+                                className="ml-0.5 rounded hover:text-destructive"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+            <p className="text-xs text-muted-foreground">{skills.length}/20 skills added</p>
+            {error && <InputError message={error} />}
+        </div>
+    );
+}
+
+function PhoneInput({
+    value,
+    onChange,
+    placeholder = '9XX XXX XXXX',
+    error,
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    placeholder?: string;
+    error?: string;
+}) {
+    const display = value ? value.replace('+63', '') : '';
+    const handleChange = (raw: string) => {
+        const digits = raw.replace(/\D/g, '').slice(0, 10);
+        onChange(digits ? `+63${digits}` : '');
+    };
+    return (
+        <>
+            <div className="flex">
+                <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-muted px-3 text-sm text-muted-foreground">
+                    +63
+                </span>
+                <Input
+                    type="text"
+                    value={display}
+                    onChange={(e) => handleChange(e.target.value)}
+                    placeholder={placeholder}
+                    maxLength={10}
+                    className="rounded-l-none rounded-r-xl"
+                />
+            </div>
+            {error && <InputError message={error} />}
+        </>
+    );
+}
+
+function FormSection({
+    icon: Icon,
+    title,
+    children,
+    index = 0,
+}: {
+    icon: React.ElementType;
+    title: string;
+    children: React.ReactNode;
+    index?: number;
+}) {
+    return (
+        <div
+            className="form-section space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
+            style={{ animationDelay: `${index * 80}ms` }}
+        >
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                    <Icon className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="text-sm font-bold text-foreground">{title}</h3>
+            </div>
+            {children}
+        </div>
+    );
+}
+
+// ---------- Main Component ----------
 export default function Update({ positions, branches, employee, site = [] }: Props) {
     const [availableSites, setAvailableSites] = useState<any[]>([]);
     const [positionSearch, setPositionSearch] = useState('');
     const [branchSearch, setBranchSearch] = useState('');
     const [siteSearch, setSiteSearch] = useState('');
-
-    // Visibility toggles for government number fields
     const [showSss, setShowSss] = useState(false);
     const [showPagibig, setShowPagibig] = useState(false);
     const [showPhilhealth, setShowPhilhealth] = useState(false);
 
+    // Parse skills safely (handle JSON string from DB)
+    const parseSkills = (skillsData: any): string[] => {
+        if (Array.isArray(skillsData)) return skillsData;
+        if (typeof skillsData === 'string' && skillsData) {
+            try {
+                const parsed = JSON.parse(skillsData);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    };
+
     const { data, setData, put, processing, errors } = useForm({
+        // User account
         name: employee.user?.name || '',
         email: employee.user?.email || '',
         password: '',
+        // Identification
+        emp_code: employee.emp_code || '',
+        employee_number: employee.employee_number || '',
+        // Avatar
+        avatar: employee.avatar || '',
+        remove_avatar: undefined as string | undefined,
+        // Assignment
         position_id: employee.position_id?.toString() || '',
         branch_id: employee.branch_id?.toString() || '',
         site_id: employee.site_id?.toString() || '',
-        emp_code: employee.emp_code || '',
+        // Contract
         contract_start_date: formatDateForInput(employee.contract_start_date),
         contract_end_date: formatDateForInput(employee.contract_end_date),
         pay_frequency: employee.pay_frequency || '',
-        employee_number: employee.employee_number || '',
+        employee_status: employee.employee_status || 'newly_hired', // ✅ use DB value, no auto‑derivation
+        // Contact
         emergency_contact_number: employee.emergency_contact_number || '',
-        employee_status: employee.employee_status || 'Inactive',
-        avatar: employee.avatar || '',
+        contact_person: employee.contact_person || '',
+        contact_person_number: employee.contact_person_number || '',
+        // Government numbers
         sss_number: employee.sss_number?.toString() || '',
         pagibig_number: employee.pagibig_number?.toString() || '',
         philhealth_number: employee.philhealth_number?.toString() || '',
+        // Personal info
+        gender: employee.gender || 'male',
+        age: employee.age || '',
+        dob: employee.dob ? formatDateForInput(employee.dob) : '',
+        mother_name: employee.mother_name || '',
+        father_name: employee.father_name || '',
+        educ_attainment: employee.educ_attainment || '',
+        certificate: employee.certificate || '',
+        permanent_address: employee.permanent_address || '',
+        present_address: employee.present_address || '',
+        skills: parseSkills(employee.skills),
     });
 
-    // Update status when dates change
+    // Auto‑compute age from DOB
     useEffect(() => {
-        if (data.contract_start_date && data.contract_end_date) {
-            setData('employee_status', getStatusFromDates(data.contract_start_date, data.contract_end_date));
-        } else {
-            setData('employee_status', 'Inactive');
-        }
-    }, [data.contract_start_date, data.contract_end_date]);
+        setData('age', computeAge(data.dob));
+    }, [data.dob]);
+
+    // ❌ REMOVED: useEffect that automatically set employee_status from contract dates
+    // Status is now fully manual via dropdown.
 
     // Initialize search values from selected items
     useEffect(() => {
-        const selectedPos = positions?.find(p => p.id === parseInt(data.position_id));
+        const selectedPos = positions?.find((p) => p.id === parseInt(data.position_id));
         if (selectedPos) setPositionSearch(selectedPos.pos_name);
-        const selectedBranch = branches?.find(b => b.id === parseInt(data.branch_id));
+        const selectedBranch = branches?.find((b) => b.id === parseInt(data.branch_id));
         if (selectedBranch) setBranchSearch(selectedBranch.branch_name);
     }, []);
 
-    // Update available sites when branch changes
+    // Filter sites by branch
     useEffect(() => {
         if (data.branch_id) {
-            const filtered = site.filter(s => s.branch_id === parseInt(data.branch_id));
+            const filtered = site.filter((s) => s.branch_id === parseInt(data.branch_id));
             setAvailableSites(filtered);
-
-            const currentSiteId = data.site_id;
-            if (currentSiteId) {
-                const stillValid = filtered.some(s => s.id === parseInt(currentSiteId));
-                if (!stillValid) {
-                    setData('site_id', '');
-                    setSiteSearch('');
-                }
-            } else {
+            if (data.site_id && !filtered.some((s) => s.id === parseInt(data.site_id))) {
                 setData('site_id', '');
                 setSiteSearch('');
             }
@@ -227,73 +436,17 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         }
     }, [data.branch_id]);
 
-    const handlePhoneChange = (field: 'employee_number' | 'emergency_contact_number', value: string) => {
-        const digits = value.replace(/\D/g, '').slice(0, 10);
-        setData(field, digits ? `+63${digits}` : '');
-    };
-    const getDisplayValue = (field: 'employee_number' | 'emergency_contact_number') => {
-        return data[field] ? data[field].replace('+63', '') : '';
-    };
-
-    // Helper for government numbers (allow digits and hyphens)
+    // Government number helper
     const handleGovNumberChange = (
         field: 'sss_number' | 'pagibig_number' | 'philhealth_number',
         value: string,
         maxLength: number
     ) => {
-        const cleaned = value.replace(/[^0-9\-]/g, '').slice(0, maxLength);
-        setData(field, cleaned);
+        setData(field, value.replace(/[^0-9\-]/g, '').slice(0, maxLength));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        put(update(employee.slug_emp).url, {
-            // onSuccess: (page) => {
-            //     toast.success((page.props as any).flash?.success || 'Employee updated successfully.');
-            // },
-            // onError: (errors) => {
-            //     toast.error(Object.values(errors).flat()[0] || 'Failed to update employee.');
-            // },
-        });
-    };
-
-    // Prepare dropdown items
-    const positionItems = positions.map(p => ({ id: p.id, name: p.pos_name }));
-    const branchItems = branches.map(b => ({ id: b.id, name: b.branch_name }));
-    const siteItems = availableSites.map(s => ({ id: s.id, name: s.site_name || s.name || '' }));
-
-    const filteredPositions = positionItems.filter(p =>
-        p.name.toLowerCase().includes(positionSearch.toLowerCase())
-    ).slice(0, 5);
-    const filteredBranches = branchItems.filter(b =>
-        b.name.toLowerCase().includes(branchSearch.toLowerCase())
-    ).slice(0, 5);
-    const filteredSites = siteItems.filter(s =>
-        s.name.toLowerCase().includes(siteSearch.toLowerCase())
-    ).slice(0, 5);
-
-    // ── Section card component ────────────────────────────────────────────────────
-    function FormSection({ icon: Icon, title, children, index = 0 }: {
-        icon: React.ElementType; title: string; children: React.ReactNode; index?: number;
-    }) {
-        return (
-            <div
-                className="form-section space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
-                style={{ animationDelay: `${index * 80}ms` }}
-            >
-                <div className="flex items-center gap-2 border-b border-border pb-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-                        <Icon className="h-4 w-4 text-primary" />
-                    </div>
-                    <h3 className="text-sm font-bold text-foreground">{title}</h3>
-                </div>
-                {children}
-            </div>
-        );
-    }
-
+    // Avatar handling
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(
         employee.avatar ? `/storage/${employee.avatar}` : null
     );
@@ -301,19 +454,38 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setAvatarFile(file);
-            const previewUrl = URL.createObjectURL(file);
-            setAvatarPreview(previewUrl);
+            setAvatarPreview(URL.createObjectURL(file));
+            setData('avatar', file as any);
+            setData('remove_avatar', undefined);
         }
     };
 
     const handleRemoveAvatar = () => {
-        setAvatarFile(null);
         setAvatarPreview(null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+        setData('avatar', null);
+        setData('remove_avatar', 'true');
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        put(update(employee.slug_emp).url);
+    };
+
+    // Prepare dropdown items
+    const positionItems = positions.map((p) => ({ id: p.id, name: p.pos_name }));
+    const branchItems = branches.map((b) => ({ id: b.id, name: b.branch_name }));
+    const siteItems = availableSites.map((s) => ({ id: s.id, name: s.site_name || s.name || '' }));
+
+    const filteredPositions = positionItems
+        .filter((p) => p.name.toLowerCase().includes(positionSearch.toLowerCase()))
+        .slice(0, 5);
+    const filteredBranches = branchItems
+        .filter((b) => b.name.toLowerCase().includes(branchSearch.toLowerCase()))
+        .slice(0, 5);
+    const filteredSites = siteItems
+        .filter((s) => s.name.toLowerCase().includes(siteSearch.toLowerCase()))
+        .slice(0, 5);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -329,7 +501,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
 
             <div className="min-h-screen py-8 md:py-10">
                 <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-                    {/* Page header */}
+                    {/* Header */}
                     <div className="mb-8 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-md">
@@ -353,7 +525,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                         </Button>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-6" encType="multipart/form-data">
                         {/* 1. Avatar */}
                         <FormSection icon={PersonStanding} title="Avatar" index={1}>
                             <div className="grid gap-2">
@@ -390,10 +562,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                                     type="button"
                                                     variant="destructive"
                                                     size="sm"
-                                                    onClick={() => {
-                                                        handleRemoveAvatar();
-                                                        setData('avatar', null);
-                                                    }}
+                                                    onClick={handleRemoveAvatar}
                                                     disabled={processing}
                                                 >
                                                     Remove
@@ -401,7 +570,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                             )}
                                         </div>
                                         <p className="text-xs text-muted-foreground">
-                                            Recommended: Square image, at least 200x200px. Max size: 2MB
+                                            Square image, at least 200×200px. Max size: 2MB
                                         </p>
                                     </div>
                                     <Input
@@ -410,11 +579,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                         type="file"
                                         name="avatar"
                                         accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
-                                        onChange={(e) => {
-                                            handleAvatarChange(e);
-                                            const file = e.target.files?.[0];
-                                            setData('avatar', file as any);
-                                        }}
+                                        onChange={handleAvatarChange}
                                         className="hidden"
                                     />
                                 </div>
@@ -427,34 +592,34 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Employee Code <span className="text-accent">*</span>
+                                        Employee Code <span className="text-destructive">*</span>
                                     </Label>
                                     <Input
                                         value={data.emp_code}
-                                        onChange={e => setData('emp_code', e.target.value)}
+                                        onChange={(e) => setData('emp_code', e.target.value)}
                                         className="rounded-xl"
                                     />
                                     <InputError message={errors.emp_code} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Full Name <span className="text-accent">*</span>
+                                        Full Name <span className="text-destructive">*</span>
                                     </Label>
                                     <Input
                                         value={data.name}
-                                        onChange={e => setData('name', e.target.value)}
+                                        onChange={(e) => setData('name', e.target.value)}
                                         className="rounded-xl"
                                     />
                                     <InputError message={errors.name} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Email <span className="text-accent">*</span>
+                                        Email <span className="text-destructive">*</span>
                                     </Label>
                                     <Input
                                         type="email"
                                         value={data.email}
-                                        onChange={e => setData('email', e.target.value)}
+                                        onChange={(e) => setData('email', e.target.value)}
                                         className="rounded-xl"
                                     />
                                     <InputError message={errors.email} />
@@ -464,7 +629,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <Input
                                         type="password"
                                         value={data.password}
-                                        onChange={e => setData('password', e.target.value)}
+                                        onChange={(e) => setData('password', e.target.value)}
                                         placeholder="Leave blank to keep current"
                                         className="rounded-xl"
                                     />
@@ -474,27 +639,151 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             </div>
                         </FormSection>
 
-                        {/* 3. Employee Details */}
-                        <FormSection icon={Briefcase} title="Employee Details" index={3}>
+                        {/* 3. Personal Information */}
+                        <FormSection icon={Users} title="Personal Information" index={3}>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Gender</Label>
+                                    <select
+                                        value={data.gender}
+                                        onChange={(e) => setData('gender', e.target.value)}
+                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
+                                    >
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                    <InputError message={errors.gender} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Date of Birth</Label>
+                                    <input
+                                        type="date"
+                                        value={data.dob}
+                                        onChange={(e) => setData('dob', e.target.value)}
+                                        max={new Date().toISOString().split('T')[0]}
+                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                    />
+                                    <InputError message={errors.dob} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Age</Label>
+                                    <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
+                                        {data.age ? (
+                                            `${data.age} years old`
+                                        ) : (
+                                            <span className="text-muted-foreground">Auto-computed from date of birth</span>
+                                        )}
+                                    </div>
+                                    <InputError message={errors.age} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Educational Attainment</Label>
+                                    <select
+                                        value={data.educ_attainment}
+                                        onChange={(e) => setData('educ_attainment', e.target.value)}
+                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
+                                    >
+                                        <option value="">Select educational attainment</option>
+                                        {EDUC_ATTAINMENT_OPTIONS.map((opt) => (
+                                            <option key={opt} value={opt}>
+                                                {opt}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError message={errors.educ_attainment} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Mother's Name</Label>
+                                    <Input
+                                        value={data.mother_name}
+                                        onChange={(e) => setData('mother_name', e.target.value)}
+                                        placeholder="e.g., Maria Santos"
+                                        className="rounded-xl"
+                                        maxLength={100}
+                                    />
+                                    <InputError message={errors.mother_name} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Father's Name</Label>
+                                    <Input
+                                        value={data.father_name}
+                                        onChange={(e) => setData('father_name', e.target.value)}
+                                        placeholder="e.g., Jose Santos"
+                                        className="rounded-xl"
+                                        maxLength={100}
+                                    />
+                                    <InputError message={errors.father_name} />
+                                </div>
+
+                                <div className="space-y-2 sm:col-span-2">
+                                    <Label className="text-sm font-semibold">Certificate / Qualification</Label>
+                                    <Input
+                                        value={data.certificate}
+                                        onChange={(e) => setData('certificate', e.target.value)}
+                                        placeholder="e.g., TESDA NC II – Electrical Installation"
+                                        className="rounded-xl"
+                                        maxLength={255}
+                                    />
+                                    <InputError message={errors.certificate} />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <SkillsInput
+                                        skills={data.skills}
+                                        onChange={(skills) => setData('skills', skills)}
+                                        error={errors.skills as string | undefined}
+                                    />
+                                </div>
+                            </div>
+                        </FormSection>
+
+                        {/* 4. Address */}
+                        <FormSection icon={Home} title="Address" index={4}>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Permanent Address</Label>
+                                    <textarea
+                                        value={data.permanent_address}
+                                        onChange={(e) => setData('permanent_address', e.target.value)}
+                                        placeholder="Barangay, Municipality, Province"
+                                        rows={3}
+                                        maxLength={500}
+                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 resize-none"
+                                    />
+                                    <InputError message={errors.permanent_address} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Present Address</Label>
+                                    <textarea
+                                        value={data.present_address}
+                                        onChange={(e) => setData('present_address', e.target.value)}
+                                        placeholder="Barangay, Municipality, Province"
+                                        rows={3}
+                                        maxLength={500}
+                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 resize-none"
+                                    />
+                                    <InputError message={errors.present_address} />
+                                </div>
+                            </div>
+                        </FormSection>
+
+                        {/* 5. Employee Details */}
+                        <FormSection icon={Briefcase} title="Employee Details" index={5}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Contact Number <span className="text-accent">*</span>
+                                        Contact Number <span className="text-destructive">*</span>
                                     </Label>
-                                    <div className="flex">
-                                        <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-muted px-3 text-sm text-muted-foreground">
-                                            +63
-                                        </span>
-                                        <Input
-                                            type="text"
-                                            value={getDisplayValue('employee_number')}
-                                            onChange={e => handlePhoneChange('employee_number', e.target.value)}
-                                            placeholder="XXX XXX XXXX"
-                                            maxLength={10}
-                                            className="rounded-l-none rounded-r-xl"
-                                        />
-                                    </div>
-                                    <InputError message={errors.employee_number} />
+                                    <PhoneInput
+                                        value={data.employee_number}
+                                        onChange={(val) => setData('employee_number', val)}
+                                        error={errors.employee_number}
+                                    />
                                 </div>
 
                                 <SearchableDropdown
@@ -511,19 +800,18 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     error={errors.position_id}
                                     placeholder="Select a position"
                                     searchPlaceholder="Search positions..."
-                                    showAllResults={false}
                                 />
 
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Pay Frequency <span className="text-accent">*</span>
+                                        Pay Frequency <span className="text-destructive">*</span>
                                     </Label>
                                     <select
                                         value={data.pay_frequency}
-                                        onChange={e => setData('pay_frequency', e.target.value)}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                                        onChange={(e) => setData('pay_frequency', e.target.value)}
+                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
                                     >
-                                        <option value="">Select a Pay Frequency</option>
+                                        <option value="">Select pay frequency</option>
                                         <option value="weekender">Weekender</option>
                                         <option value="monthly">Monthly</option>
                                         <option value="semi_monthly">Semi-Monthly</option>
@@ -531,49 +819,69 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <InputError message={errors.pay_frequency} />
                                 </div>
 
+                                {/* Status – fully manual control */}
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">
-                                        Status
-                                    </Label>
-                                    <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
-                                        <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                                        {data.employee_status || 'Inactive'}
-                                    </div>
+                                    <Label className="text-sm font-semibold">Status</Label>
+                                    <select
+                                        value={data.employee_status}
+                                        onChange={(e) => setData('employee_status', e.target.value)}
+                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
+                                    >
+                                        {Object.entries(STATUS_LABEL).map(([value, label]) => (
+                                            <option key={value} value={value}>
+                                                {label}
+                                            </option>
+                                        ))}
+                                    </select>
                                     <InputError message={errors.employee_status} />
                                 </div>
 
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">
+                                        Emergency Contact Number <span className="text-destructive">*</span>
+                                    </Label>
+                                    <PhoneInput
+                                        value={data.emergency_contact_number}
+                                        onChange={(val) => setData('emergency_contact_number', val)}
+                                        error={errors.emergency_contact_number}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">Contact Person</Label>
+                                    <Input
+                                        value={data.contact_person}
+                                        onChange={(e) => setData('contact_person', e.target.value)}
+                                        placeholder="e.g., Maria Santos"
+                                        className="rounded-xl"
+                                        maxLength={100}
+                                    />
+                                    <InputError message={errors.contact_person} />
+                                </div>
+
                                 <div className="space-y-2 sm:col-span-2">
-                                    <Label className="text-sm font-semibold">Emergency Contact</Label>
-                                    <div className="flex">
-                                        <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-muted px-3 text-sm text-muted-foreground">
-                                            +63
-                                        </span>
-                                        <Input
-                                            type="text"
-                                            value={getDisplayValue('emergency_contact_number')}
-                                            onChange={e => handlePhoneChange('emergency_contact_number', e.target.value)}
-                                            placeholder="XXX XXX XXXX"
-                                            maxLength={10}
-                                            className="rounded-l-none rounded-r-xl"
-                                        />
-                                    </div>
+                                    <Label className="text-sm font-semibold">Contact Person Number</Label>
+                                    <PhoneInput
+                                        value={data.contact_person_number}
+                                        onChange={(val) => setData('contact_person_number', val)}
+                                        error={errors.contact_person_number}
+                                    />
                                 </div>
                             </div>
                         </FormSection>
 
-                        {/* 4. Government Numbers (SSS, Pag-IBIG, PhilHealth) with show/hide */}
-                        <FormSection icon={Shield} title="Government Numbers" index={4}>
+                        {/* 6. Government Numbers */}
+                        <FormSection icon={Shield} title="Government Numbers" index={6}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                {/* SSS Number */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        SSS Number <span className="text-accent">*</span>
+                                        SSS Number <span className="text-destructive">*</span>
                                     </Label>
                                     <div className="relative">
                                         <Input
-                                            type={showSss ? "text" : "password"}
+                                            type={showSss ? 'text' : 'password'}
                                             value={data.sss_number}
-                                            onChange={e => handleGovNumberChange('sss_number', e.target.value, 15)}
+                                            onChange={(e) => handleGovNumberChange('sss_number', e.target.value, 15)}
                                             placeholder="e.g., 12-3456789-1"
                                             maxLength={15}
                                             className="rounded-xl pr-10"
@@ -583,26 +891,21 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                             onClick={() => setShowSss(!showSss)}
                                             className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
                                         >
-                                            {showSss ? (
-                                                <EyeOff className="h-4 w-4" />
-                                            ) : (
-                                                <Eye className="h-4 w-4" />
-                                            )}
+                                            {showSss ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
                                     </div>
                                     <InputError message={errors.sss_number} />
                                 </div>
 
-                                {/* Pag-IBIG Number */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Pag-IBIG Membership ID <span className="text-accent">*</span>
+                                        Pag-IBIG Membership ID <span className="text-destructive">*</span>
                                     </Label>
                                     <div className="relative">
                                         <Input
-                                            type={showPagibig ? "text" : "password"}
+                                            type={showPagibig ? 'text' : 'password'}
                                             value={data.pagibig_number}
-                                            onChange={e => handleGovNumberChange('pagibig_number', e.target.value, 15)}
+                                            onChange={(e) => handleGovNumberChange('pagibig_number', e.target.value, 15)}
                                             placeholder="e.g., 9102-1234-5678"
                                             maxLength={15}
                                             className="rounded-xl pr-10"
@@ -618,16 +921,15 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <InputError message={errors.pagibig_number} />
                                 </div>
 
-                                {/* PhilHealth Number */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        PhilHealth Identification Number (PIN) <span className="text-accent">*</span>
+                                        PhilHealth Identification Number (PIN) <span className="text-destructive">*</span>
                                     </Label>
                                     <div className="relative">
                                         <Input
-                                            type={showPhilhealth ? "text" : "password"}
+                                            type={showPhilhealth ? 'text' : 'password'}
                                             value={data.philhealth_number}
-                                            onChange={e => handleGovNumberChange('philhealth_number', e.target.value, 15)}
+                                            onChange={(e) => handleGovNumberChange('philhealth_number', e.target.value, 15)}
                                             placeholder="e.g., 9102-1234-5678"
                                             maxLength={15}
                                             className="rounded-xl pr-10"
@@ -645,28 +947,28 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             </div>
                         </FormSection>
 
-                        {/* 5. Contract Period */}
-                        <FormSection icon={Calendar} title="Contract Period" index={5}>
+                        {/* 7. Contract Period */}
+                        <FormSection icon={Calendar} title="Contract Period" index={7}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Start Date <span className="text-accent">*</span>
+                                        Start Date <span className="text-destructive">*</span>
                                     </Label>
                                     <DatePicker
                                         value={data.contract_start_date}
                                         onChange={(date) => setData('contract_start_date', date)}
-                                        placeholder='Select contract start date'
+                                        placeholder="Select contract start date"
                                     />
                                     <InputError message={errors.contract_start_date} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        End Date <span className="text-accent">*</span>
+                                        End Date <span className="text-destructive">*</span>
                                     </Label>
                                     <DatePicker
                                         value={data.contract_end_date}
                                         onChange={(date) => setData('contract_end_date', date)}
-                                        placeholder='Select contract end date'
+                                        placeholder="Select contract end date"
                                         minDate={data.contract_start_date ? new Date(data.contract_start_date) : undefined}
                                     />
                                     <InputError message={errors.contract_end_date} />
@@ -674,8 +976,8 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             </div>
                         </FormSection>
 
-                        {/* 6. Location Assignment */}
-                        <FormSection icon={MapPin} title="Location Assignment" index={6}>
+                        {/* 8. Location Assignment */}
+                        <FormSection icon={MapPin} title="Location Assignment" index={8}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <SearchableDropdown
                                     label="Branch"
@@ -691,7 +993,6 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     error={errors.branch_id}
                                     placeholder="Select a branch"
                                     searchPlaceholder="Search branches..."
-                                    showAllResults={false}
                                 />
 
                                 {data.branch_id && (
@@ -707,16 +1008,15 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                         onSearchChange={setSiteSearch}
                                         required
                                         error={errors.site_id}
-                                        placeholder="Select a site"
+                                        placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
                                         searchPlaceholder="Search sites..."
-                                        showAllResults={false}
                                         disabled={availableSites.length === 0}
                                     />
                                 )}
                             </div>
                         </FormSection>
 
-                        {/* Submit button */}
+                        {/* Submit */}
                         <div className="flex justify-end pt-4">
                             <Button
                                 type="submit"

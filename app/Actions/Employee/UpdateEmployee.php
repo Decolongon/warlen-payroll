@@ -41,7 +41,6 @@ class UpdateEmployee
         $startDate = \Carbon\Carbon::parse($data['contract_start_date']);
         $endDate = \Carbon\Carbon::parse($data['contract_end_date']);
         $duration = $startDate->diffInDays($endDate);
-        
         $employee->update([
             'position_id' => $data['position_id'] ?? null,
             'branch_id' => $data['branch_id'] ?? null,
