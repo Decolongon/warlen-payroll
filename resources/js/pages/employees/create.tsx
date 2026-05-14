@@ -13,13 +13,11 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
-// ── Breadcrumbs ───────────────────────────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Employees', href: '/employees' },
     { title: 'Create', href: '/employees/create' },
 ];
 
-// ── Interfaces ────────────────────────────────────────────────────────────────
 interface Site {
     id: number;
     site_name: string;
@@ -38,19 +36,6 @@ interface Props {
     site: Site[];
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const EDUC_ATTAINMENT_OPTIONS = [
-    'Elementary Graduate',
-    'High School Graduate',
-    'Senior High School Graduate',
-    'Vocational',
-    'Associate Degree',
-    "Bachelor's Degree",
-    "Master's Degree",
-    'Doctorate',
-    'No Formal Education',
-];
-
 const STATUS_LABEL: Record<string, string> = {
     active: 'Active',
     newly_hired: 'Newly Hired',
@@ -60,7 +45,6 @@ const STATUS_LABEL: Record<string, string> = {
     resigned: 'Resigned',
 };
 
-// ── Helper: derive status from contract dates ─────────────────────────────────
 const getStatusFromDates = (start: string, end: string): string => {
     if (!start || !end) return 'newly_hired';
     const today = new Date();
@@ -72,7 +56,6 @@ const getStatusFromDates = (start: string, end: string): string => {
     return today >= startDate && today <= endDate ? 'active' : 'newly_hired';
 };
 
-// ── Helper: compute age from date of birth ────────────────────────────────────
 const computeAge = (dob: string): string => {
     if (!dob) return '';
     const birth = new Date(dob);
@@ -83,7 +66,37 @@ const computeAge = (dob: string): string => {
     return age >= 0 ? String(age) : '';
 };
 
-// ── Section card ──────────────────────────────────────────────────────────────
+// NEW: Human-readable duration formatter
+function formatDateRange(startDateStr: string | null, endDateStr: string | null): string {
+    if (!startDateStr || !endDateStr) return 'Undefined';
+
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 'Invalid dates';
+    if (end < start) return 'End date before start date';
+
+    let years = end.getFullYear() - start.getFullYear();
+    let months = end.getMonth() - start.getMonth();
+    let days = end.getDate() - start.getDate();
+
+    if (days < 0) {
+        months--;
+        const lastMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+        days += lastMonth.getDate();
+    }
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+
+    const parts: string[] = [];
+    if (years > 0) parts.push(`${years} year${years !== 1 ? 's' : ''}`);
+    if (months > 0) parts.push(`${months} month${months !== 1 ? 's' : ''}`);
+    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+
+    return parts.length ? parts.join(', ') : '0 days';
+}
+
 function FormSection({
     icon: Icon,
     title,
@@ -111,7 +124,6 @@ function FormSection({
     );
 }
 
-// ── Searchable Dropdown ───────────────────────────────────────────────────────
 interface DropdownItem {
     id: number | string;
     name: string;
@@ -220,7 +232,6 @@ function SearchableDropdown({
     );
 }
 
-// ── Skills input ──────────────────────────────────────────────────────────────
 function SkillsInput({
     skills,
     onChange,
@@ -296,7 +307,6 @@ function SkillsInput({
     );
 }
 
-// ── Phone prefix wrapper ──────────────────────────────────────────────────────
 function PhoneInput({
     value,
     onChange,
@@ -333,7 +343,6 @@ function PhoneInput({
     );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function Create({ positions, branches, site = [] }: Props) {
     const [availableSites, setAvailableSites] = useState<Site[]>([]);
     const [positionSearch, setPositionSearch] = useState('');
@@ -343,33 +352,26 @@ export default function Create({ positions, branches, site = [] }: Props) {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { data, setData, post, processing, errors } = useForm({
-        // ── User account
         name: '',
         email: '',
         password: '',
-        // ── Identification
         emp_code: '',
         employee_number: '',
-        // ── Avatar
         avatar: null as File | null,
-        // ── Assignment
         position_id: '',
         branch_id: '',
         site_id: '',
-        // ── Contract
         contract_start_date: '',
         contract_end_date: '',
         pay_frequency: '',
         employee_status: 'newly_hired',
-        // ── Contact
         emergency_contact_number: '',
         contact_person: '',
         contact_person_number: '',
-        // ── Government numbers
         sss_number: '',
         pagibig_number: '',
         philhealth_number: '',
-        // ── Personal info
+        tin_number: '',
         gender: 'male',
         age: '',
         dob: '',
@@ -382,7 +384,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
         skills: [] as string[],
     });
 
-    // Filter available sites by selected branch
+    // Filter sites by selected branch
     useEffect(() => {
         if (data.branch_id) {
             const filtered = site.filter(s => s.branch_id === parseInt(data.branch_id));
@@ -398,12 +400,12 @@ export default function Create({ positions, branches, site = [] }: Props) {
         }
     }, [data.branch_id]);
 
-    // Auto-compute age from DOB
+    // Auto‑compute age from DOB
     useEffect(() => {
         setData('age', computeAge(data.dob));
     }, [data.dob]);
 
-    // Auto-derive employee_status from contract dates
+    // Auto‑derive employee_status from contract dates
     useEffect(() => {
         setData(
             'employee_status',
@@ -413,7 +415,8 @@ export default function Create({ positions, branches, site = [] }: Props) {
         );
     }, [data.contract_start_date, data.contract_end_date]);
 
-    // ── Avatar helpers ────────────────────────────────────────────────────────
+    // (Removed calculatedDuration state – we now compute formatted string directly)
+
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -427,22 +430,19 @@ export default function Create({ positions, branches, site = [] }: Props) {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    // ── Government number helper ──────────────────────────────────────────────
     const handleGovNumberChange = (
-        field: 'sss_number' | 'pagibig_number' | 'philhealth_number',
+        field: 'sss_number' | 'pagibig_number' | 'philhealth_number' | 'tin_number',
         value: string,
         maxLength: number,
     ) => {
         setData(field, value.replace(/[^0-9\-]/g, '').slice(0, maxLength));
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         post(store().url);
     };
 
-    // ── Dropdown item lists ───────────────────────────────────────────────────
     const filteredPositions = positions
         .map(p => ({ id: p.id, name: p.pos_name }))
         .filter(p => p.name.toLowerCase().includes(positionSearch.toLowerCase()))
@@ -458,7 +458,9 @@ export default function Create({ positions, branches, site = [] }: Props) {
         .filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase()))
         .slice(0, 5);
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    // Human-readable contract duration
+    const contractDuration = formatDateRange(data.contract_start_date, data.contract_end_date);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Employee" />
@@ -473,8 +475,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
 
             <div className="min-h-screen py-8 md:py-10">
                 <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-
-                    {/* ── Page header ─────────────────────────────────────── */}
+                    {/* Page header */}
                     <div className="mb-8 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-md">
@@ -499,8 +500,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6" encType="multipart/form-data">
-
-                        {/* ── 1. Avatar ────────────────────────────────────── */}
+                        {/* 1. Avatar */}
                         <FormSection icon={PersonStanding} title="Avatar" index={1}>
                             <div className="grid gap-2">
                                 <Label>Profile picture</Label>
@@ -543,7 +543,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                             </div>
                         </FormSection>
 
-                        {/* ── 2. User Details ──────────────────────────────── */}
+                        {/* 2. User Details */}
                         <FormSection icon={User} title="User Details" index={2}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
@@ -569,11 +569,9 @@ export default function Create({ positions, branches, site = [] }: Props) {
                             </div>
                         </FormSection>
 
-                        {/* ── 3. Personal Information ──────────────────────── */}
+                        {/* 3. Personal Information */}
                         <FormSection icon={Users} title="Personal Information" index={3}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-                                {/* Gender */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Gender</Label>
                                     <select
@@ -586,8 +584,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     </select>
                                     <InputError message={errors.gender} />
                                 </div>
-
-                                {/* Date of Birth */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Date of Birth</Label>
                                     <input
@@ -599,36 +595,24 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.dob} />
                                 </div>
-
-                                {/* Age — auto-computed from DOB, read-only */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Age</Label>
                                     <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
-                                        {data.age
-                                            ? `${data.age} years old`
-                                            : <span className="text-muted-foreground">Auto-computed from date of birth</span>
-                                        }
+                                        {data.age ? `${data.age} years old` : <span className="text-muted-foreground">Auto-computed from date of birth</span>}
                                     </div>
                                     <InputError message={errors.age} />
                                 </div>
-
-                                {/* Educational Attainment */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Educational Attainment</Label>
-                                    <select
+                                    <Input
                                         value={data.educ_attainment}
                                         onChange={e => setData('educ_attainment', e.target.value)}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
-                                    >
-                                        <option value="">Select educational attainment</option>
-                                        {EDUC_ATTAINMENT_OPTIONS.map(opt => (
-                                            <option key={opt} value={opt}>{opt}</option>
-                                        ))}
-                                    </select>
+                                        placeholder="e.g., High School Graduate"
+                                        className="rounded-xl"
+                                        maxLength={100}
+                                    />
                                     <InputError message={errors.educ_attainment} />
                                 </div>
-
-                                {/* Mother's Name */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Mother's Name</Label>
                                     <Input
@@ -640,8 +624,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.mother_name} />
                                 </div>
-
-                                {/* Father's Name */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Father's Name</Label>
                                     <Input
@@ -653,8 +635,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.father_name} />
                                 </div>
-
-                                {/* Certificate */}
                                 <div className="space-y-2 sm:col-span-2">
                                     <Label className="text-sm font-semibold">Certificate / Qualification</Label>
                                     <Input
@@ -666,8 +646,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.certificate} />
                                 </div>
-
-                                {/* Skills */}
                                 <div className="sm:col-span-2">
                                     <SkillsInput
                                         skills={data.skills}
@@ -678,7 +656,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                             </div>
                         </FormSection>
 
-                        {/* ── 4. Address ───────────────────────────────────── */}
+                        {/* 4. Address */}
                         <FormSection icon={Home} title="Address" index={4}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
@@ -708,11 +686,9 @@ export default function Create({ positions, branches, site = [] }: Props) {
                             </div>
                         </FormSection>
 
-                        {/* ── 5. Employee Details ──────────────────────────── */}
+                        {/* 5. Employee Details */}
                         <FormSection icon={Briefcase} title="Employee Details" index={5}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-                                {/* Contact Number */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Contact Number <span className="text-destructive">*</span></Label>
                                     <PhoneInput
@@ -721,8 +697,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                         error={errors.employee_number}
                                     />
                                 </div>
-
-                                {/* Position */}
                                 <SearchableDropdown
                                     label="Position"
                                     items={filteredPositions}
@@ -735,8 +709,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     placeholder="Select a position"
                                     searchPlaceholder="Search positions..."
                                 />
-
-                                {/* Pay Frequency */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Pay Frequency <span className="text-destructive">*</span></Label>
                                     <select
@@ -751,8 +723,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     </select>
                                     <InputError message={errors.pay_frequency} />
                                 </div>
-
-                                {/* Status — dropdown, auto-seeded from contract dates */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Status</Label>
                                     <select
@@ -766,8 +736,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     </select>
                                     <InputError message={errors.employee_status} />
                                 </div>
-
-                                {/* Emergency Contact Number */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Emergency Contact Number <span className="text-destructive">*</span></Label>
                                     <PhoneInput
@@ -776,8 +744,6 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                         error={errors.emergency_contact_number}
                                     />
                                 </div>
-
-                                {/* Contact Person Name */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Contact Person</Label>
                                     <Input
@@ -789,9 +755,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.contact_person} />
                                 </div>
-
-                                {/* Contact Person Number */}
-                                <div className="space-y-2 sm:col-span-2">
+                                <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Contact Person Number</Label>
                                     <PhoneInput
                                         value={data.contact_person_number}
@@ -802,13 +766,13 @@ export default function Create({ positions, branches, site = [] }: Props) {
                             </div>
                         </FormSection>
 
-                        {/* ── 6. Government Numbers ────────────────────────── */}
+                        {/* 6. Government Numbers */}
                         <FormSection icon={Shield} title="Government Numbers" index={6}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">SSS Number <span className="text-destructive">*</span></Label>
+                                    <Label className="text-sm font-semibold">SSS Number </Label>
                                     <Input
-                                        type="text"
+                                        type="password"
                                         value={data.sss_number}
                                         onChange={e => handleGovNumberChange('sss_number', e.target.value, 15)}
                                         placeholder="e.g., 12-3456789-1"
@@ -818,9 +782,9 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     <InputError message={errors.sss_number} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">Pag-IBIG Membership ID <span className="text-destructive">*</span></Label>
+                                    <Label className="text-sm font-semibold">Pag-IBIG Membership ID </Label>
                                     <Input
-                                        type="text"
+                                        type="password"
                                         value={data.pagibig_number}
                                         onChange={e => handleGovNumberChange('pagibig_number', e.target.value, 15)}
                                         placeholder="e.g., 9102-1234-5678"
@@ -830,9 +794,9 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     <InputError message={errors.pagibig_number} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">PhilHealth ID Number (PIN) <span className="text-destructive">*</span></Label>
+                                    <Label className="text-sm font-semibold">PhilHealth ID Number (PIN)</Label>
                                     <Input
-                                        type="text"
+                                        type="password"
                                         value={data.philhealth_number}
                                         onChange={e => handleGovNumberChange('philhealth_number', e.target.value, 15)}
                                         placeholder="e.g., 9102-1234-5678"
@@ -841,44 +805,35 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.philhealth_number} />
                                 </div>
-                            </div>
-                        </FormSection>
-
-                        {/* ── 7. Contract Period ───────────────────────────── */}
-                        <FormSection icon={Calendar} title="Contract Period" index={7}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">Start Date <span className="text-destructive">*</span></Label>
-                                    <input
-                                        type="date"
-                                        value={data.contract_start_date}
-                                        onChange={e => setData('contract_start_date', e.target.value)}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                    <Label className="text-sm font-semibold">TIN Number </Label>
+                                    <Input
+                                        type="password"
+                                        value={data.tin_number}
+                                        onChange={e => handleGovNumberChange('tin_number', e.target.value, 15)}
+                                        placeholder="e.g., 123-456-789-000"
+                                        maxLength={15}
+                                        className="rounded-xl"
                                     />
-                                    <InputError message={errors.contract_start_date} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">End Date <span className="text-destructive">*</span></Label>
-                                    <input
-                                        type="date"
-                                        value={data.contract_end_date}
-                                        onChange={e => setData('contract_end_date', e.target.value)}
-                                        min={data.contract_start_date || undefined}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                                    />
-                                    <InputError message={errors.contract_end_date} />
+                                    <InputError message={errors.tin_number} />
                                 </div>
                             </div>
                         </FormSection>
 
-                        {/* ── 8. Location Assignment ───────────────────────── */}
-                        <FormSection icon={MapPin} title="Location Assignment" index={8}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                        {/* 8. Location Assignment */}
+                        <FormSection icon={MapPin} title="Assignment & Contract Period" index={7}>
+                            <div className="space-y-6">
+                                {/* Location row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <SearchableDropdown
                                     label="Branch"
                                     items={filteredBranches}
                                     selectedId={data.branch_id}
-                                    onSelect={(id, name) => { setData('branch_id', id); setBranchSearch(name); }}
+                                    onSelect={(id, name) => {
+                                    setData('branch_id', id);
+                                    setBranchSearch(name);
+                                    }}
                                     searchValue={branchSearch}
                                     onSearchChange={setBranchSearch}
                                     required
@@ -889,23 +844,64 @@ export default function Create({ positions, branches, site = [] }: Props) {
 
                                 {data.branch_id && (
                                     <SearchableDropdown
-                                        label="Site"
-                                        items={filteredSites}
-                                        selectedId={data.site_id}
-                                        onSelect={(id, name) => { setData('site_id', id); setSiteSearch(name); }}
-                                        searchValue={siteSearch}
-                                        onSearchChange={setSiteSearch}
-                                        required
-                                        error={errors.site_id}
-                                        placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
-                                        searchPlaceholder="Search sites..."
-                                        disabled={availableSites.length === 0}
+                                    label="Site"
+                                    items={filteredSites}
+                                    selectedId={data.site_id}
+                                    onSelect={(id, name) => {
+                                        setData('site_id', id);
+                                        setSiteSearch(name);
+                                    }}
+                                    searchValue={siteSearch}
+                                    onSearchChange={setSiteSearch}
+                                    required
+                                    error={errors.site_id}
+                                    placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
+                                    searchPlaceholder="Search sites..."
+                                    disabled={availableSites.length === 0}
                                     />
                                 )}
+                                </div>
+
+                                {/* Contract period row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">
+                                    Start Date <span className="text-destructive">*</span>
+                                    </Label>
+                                    <input
+                                    type="date"
+                                    value={data.contract_start_date}
+                                    onChange={(e) => setData('contract_start_date', e.target.value)}
+                                    className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                    />
+                                    <InputError message={errors.contract_start_date} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">End Date</Label>
+                                    <input
+                                    type="date"
+                                    value={data.contract_end_date}
+                                    onChange={(e) => setData('contract_end_date', e.target.value)}
+                                    min={data.contract_start_date || undefined}
+                                    className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                    />
+                                    <InputError message={errors.contract_end_date} />
+                                </div>
+
+                                {/* Human‑readable duration */}
+                                <div className="sm:col-span-2">
+                                    <Label className="text-sm font-semibold">Contract Duration</Label>
+                                    <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
+                                    {contractDuration}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Auto‑calculated from contract dates</p>
+                                </div>
+                                </div>
                             </div>
                         </FormSection>
 
-                        {/* ── Submit ───────────────────────────────────────── */}
+                        {/* Submit */}
                         <div className="flex justify-end pt-4">
                             <Button
                                 type="submit"

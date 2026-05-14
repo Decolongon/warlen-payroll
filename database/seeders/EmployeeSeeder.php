@@ -26,29 +26,37 @@ class EmployeeSeeder extends Seeder
         return $number;
     }
 
-    private function generateSssNumber(): string
-    {
-        do {
-            $number = str_pad(rand(0, 9999999999), 10, '0', STR_PAD_LEFT);
-        } while (Employee::where('sss_number', $number)->exists());
-        return $number;
-    }
+    // private function generateSssNumber(): string
+    // {
+    //     do {
+    //         $number = str_pad(rand(0, 9999999999), 10, '0', STR_PAD_LEFT);
+    //     } while (Employee::where('sss_number', $number)->exists());
+    //     return $number;
+    // }
 
-    private function generatePagibigNumber(): string
-    {
-        do {
-            $number = str_pad(rand(0, 999999999999), 12, '0', STR_PAD_LEFT);
-        } while (Employee::where('pagibig_number', $number)->exists());
-        return $number;
-    }
+    // private function generatePagibigNumber(): string
+    // {
+    //     do {
+    //         $number = str_pad(rand(0, 999999999999), 12, '0', STR_PAD_LEFT);
+    //     } while (Employee::where('pagibig_number', $number)->exists());
+    //     return $number;
+    // }
 
-    private function generatePhilhealthNumber(): string
-    {
-        do {
-            $number = str_pad(rand(0, 999999999999), 12, '0', STR_PAD_LEFT);
-        } while (Employee::where('philhealth_number', $number)->exists());
-        return $number;
-    }
+    // private function generatePhilhealthNumber(): string
+    // {
+    //     do {
+    //         $number = str_pad(rand(0, 999999999999), 12, '0', STR_PAD_LEFT);
+    //     } while (Employee::where('philhealth_number', $number)->exists());
+    //     return $number;
+    // }
+
+    // private function generateTinNumber(): string
+    // {
+    //     do {
+    //         $number = str_pad(rand(0, 999999999999), 12, '0', STR_PAD_LEFT);
+    //     } while (Employee::where('tin_number', $number)->exists());
+    //     return $number;
+    // }
 
     /**
      * Always Bacolod branch
@@ -6930,7 +6938,7 @@ class EmployeeSeeder extends Seeder
             // Contract end
             $contractEnd = !empty($e['date_end'])
                 ? Carbon::parse($e['date_end'])
-                : $contractStart->copy()->addYear();
+                : null;
 
             $results[] = [
                 'name'                  => $name,
@@ -6948,12 +6956,12 @@ class EmployeeSeeder extends Seeder
                 'contact_person_number' => $e['contact_number2'] ?? null,
                 'mother_name'           => $e['mother_name'] ?? null,
                 'father_name'           => $e['father_name'] ?? null,
-                'sss_number'            => !empty($e['sss']) ? $e['sss'] : null,
-                'philhealth_number'     => !empty($e['philhealth']) ? $e['philhealth'] : null,
-                'pagibig_number'        => !empty($e['pagibig']) ? $e['pagibig'] : null,
+                'sss_number'            => $e['sss'] ?? null,
+                'philhealth_number'     => $e['philhealth'] ?? null,
+                'pagibig_number'        => $e['pagibig'] ?? null,
                 'tin_number'            => $e['tin'] ?? null,
                 'contract_start_date'   => $contractStart->format('Y-m-d'),
-                'contract_end_date'     => $contractEnd->format('Y-m-d'),
+                'contract_end_date' => $contractEnd ? $contractEnd->format('Y-m-d') : null,
                 'educ_attainment'       => $e['educ'] ?? null,
                 'certificate'           => $e['certificates'] ?? null,
                 'skills'                => $e['skills'] ?? null,
@@ -7052,11 +7060,12 @@ class EmployeeSeeder extends Seeder
                 'slug_emp'                  => Str::slug($user->name . '-' . $empCode),
                 'emp_code'                  => $empCode,
                 'employee_number'           => $this->generateEmployeeNumber(),
-                'sss_number'                => $extra['sss_number']        ?? $this->generateSssNumber(),
-                'pagibig_number'            => $extra['pagibig_number']     ?? $this->generatePagibigNumber(),
-                'philhealth_number'         => $extra['philhealth_number']  ?? $this->generatePhilhealthNumber(),
+                'sss_number'                => $extra['sss_number']        ?? null,
+                'pagibig_number'            => $extra['pagibig_number']     ?? null,
+                'philhealth_number'         => $extra['philhealth_number']  ?? null,
+                'tin_number'                => $extra['tin_number']         ?? null,
                 'contract_start_date'       => $extra['contract_start_date'] ?? now(),
-                'contract_end_date'         => $extra['contract_end_date']   ?? now()->addYear(),
+                'contract_end_date'         => $extra['contract_end_date']   ?? null,
                 'emergency_contact_number'  => $extra['contact_person_number'] ?? '09123456789',
                 'pay_frequency'             => 'weekender',
                 'employee_status'           => $empStatus,
@@ -7073,7 +7082,7 @@ class EmployeeSeeder extends Seeder
                 'certificate'               => $extra['certificate']       ?? null,
                 'permanent_address'         => $extra['permanent_address'] ?? null,
                 'present_address'           => $extra['present_address']   ?? null,
-                'duration'                  => null,
+                'duration'                  => $extra['duration']          ?? null,
             ]
         );
     }

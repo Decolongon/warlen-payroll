@@ -38,16 +38,17 @@ return new class extends Migration
             $table->string('permanent_address')->nullable();
             $table->string('present_address')->nullable();
             $table->date('contract_start_date');
-            $table->date('contract_end_date');
+            $table->date('contract_end_date')->nullable();
             $table->integer('duration')->nullable();
-            $table->string('sss_number')->unique();
-            $table->string('philhealth_number')->unique();
-            $table->string('pagibig_number')->unique();
+            $table->string('sss_number')->unique()->nullable();
+            $table->string('philhealth_number')->unique()->nullable();
+            $table->string('pagibig_number')->unique()->nullable();
+            $table->string('tin_number')->unique()->nullable();
             $table->enum('pay_frequency',['weekender','monthly','semi_monthly'])->default('monthly');
             $table->enum('employee_status',['active','end_of_contract', 'awol','terminated', 'resigned', 'newly_hired'])->default('active'); 
             $table->index([ 'emp_code', 'employee_status']);
             $table->softDeletes();
-        
+    
             $table->timestamps();
         });
     }

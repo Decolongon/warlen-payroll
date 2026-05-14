@@ -1,12 +1,11 @@
 import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { Users, Search, UserPlus, Archive, UsersRound, RotateCcw, Briefcase, Building2, } from 'lucide-react';
+import { Users, Search, UserPlus, Archive, UsersRound, RotateCcw, Briefcase, Building2 } from 'lucide-react';
 import { useState, useRef, useMemo, useEffect } from 'react';
 import EmployeeController from '@/actions/App/Http/Controllers/EmployeeController';
 import { CustomHeader } from '@/components/custom-header';
 import { CustomPagination } from '@/components/custom-pagination';
 import { CustomTable } from '@/components/custom-table';
-// import { CustomToast, toast } from '@/components/custom-toast';
 import type { BranchData } from '@/components/employee/employee-filter-bar';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -17,19 +16,16 @@ import { EmployeesTableConfig } from '@/config/tables/employees-table';
 import { DeleteConfirmationDialog } from '@/components/delete-confirmation-modal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Employees', href: '/employees' },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Employees', href: '/employees' }];
 
-// Custom toast style helper
 const toastStyle = (color: string) => ({
     style: {
         backgroundColor: 'white',
-        color: color,
+        color,
         border: '1px solid #e2e8f0',
         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
     },
@@ -65,6 +61,7 @@ interface FilterProps {
     positions?: string;
     branch?: string;
     site?: string;
+    /** Single employee_status enum value, or "" for all */
     status?: string;
     date_from?: string;
     date_to?: string;
@@ -110,154 +107,112 @@ export default function Index({
     const { delete: destroy } = useForm();
     const { props } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>();
 
-    // Track last shown flash to prevent duplicates within a short time window
     const lastFlashRef = useRef<{ key: string; time: number }>({ key: '', time: 0 });
 
-    // Flash message listener – prevents duplicate toasts within 500ms
     useEffect(() => {
         const flash = props.flash;
         if (!flash) return;
-
         const flashKey = JSON.stringify(flash);
         const now = Date.now();
         const last = lastFlashRef.current;
-
-        // If same flash key appeared within last 500ms, skip (prevents double toast)
-        if (last.key === flashKey && (now - last.time) < 500) {
-            return;
-        }
-
-        // Update ref
+        if (last.key === flashKey && now - last.time < 500) return;
         lastFlashRef.current = { key: flashKey, time: now };
-
-        if (flash.success) {
-            toast.success(flash.success, toastStyle('#16a34a')); // green text
-        }
-        if (flash.error) {
-            toast.error(flash.error, toastStyle('#dc2626')); // red text
-        }
-        if (flash.warning) {
-            toast.warning(flash.warning, toastStyle('#f97316')); // orange text
-        }
-        if (flash.info) {
-            toast.info(flash.info, toastStyle('#3b82f6')); // blue text
-        }
+        if (flash.success) toast.success(flash.success, toastStyle('#16a34a'));
+        if (flash.error) toast.error(flash.error, toastStyle('#dc2626'));
+        if (flash.warning) toast.warning(flash.warning, toastStyle('#f97316'));
+        if (flash.info) toast.info(flash.info, toastStyle('#3b82f6'));
     }, [props.flash]);
 
-    // Tab state
+    // ── Tab state ────────────────────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<'active' | 'archived'>(
-        filters.show_archived === 'true' ? 'archived' : 'active'
+        filters.show_archived === 'true' ? 'archived' : 'active',
     );
 
-    // ── Active tab filter state (server‑side) ────────────────────────────────
+    // ── Active tab filter state (server-side) ────────────────────────────────
     const [searchTerm, setSearchTerm] = useState(filters.search ?? '');
     const [selectedPositions, setSelectedPositions] = useState<string[]>(
-        filters.positions ? filters.positions.split(',').filter(Boolean) : []
+        filters.positions ? filters.positions.split(',').filter(Boolean) : [],
     );
     const [selectedBranch, setSelectedBranch] = useState(filters.branch ?? '');
     const [selectedSite, setSelectedSite] = useState(filters.site ?? '');
-    const [status, setStatus] = useState<string>(filters.status ?? '');
+    // Single status value from server
+    const [status, setStatus] = useState(filters.status ?? '');
     const [dateFrom, setDateFrom] = useState<Date | undefined>(
-        filters.date_from ? new Date(filters.date_from) : undefined
+        filters.date_from ? new Date(filters.date_from) : undefined,
     );
     const [dateTo, setDateTo] = useState<Date | undefined>(
-        filters.date_to ? new Date(filters.date_to) : undefined
+        filters.date_to ? new Date(filters.date_to) : undefined,
     );
 
-    // ── Archived tab filter state (client‑side, independent) ─────────────────
+    // ── Archived tab filter state (client-side) ──────────────────────────────
     const [archivedSearchTerm, setArchivedSearchTerm] = useState('');
     const [archivedSelectedPositions, setArchivedSelectedPositions] = useState<string[]>([]);
     const [archivedSelectedBranch, setArchivedSelectedBranch] = useState('');
     const [archivedSelectedSite, setArchivedSelectedSite] = useState('');
 
-    // ── Bulk selection state ─────────────────────────────────────────────────
+    // ── Bulk selection ───────────────────────────────────────────────────────
     const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
     const [bulkLoading, setBulkLoading] = useState(false);
     const [bulkArchiveConfirmOpen, setBulkArchiveConfirmOpen] = useState(false);
 
-    // ── Bulk assign states ───────────────────────────────────────────────────
+    // ── Bulk assign ──────────────────────────────────────────────────────────
     const [assignPositionOpen, setAssignPositionOpen] = useState(false);
     const [assignBranchOpen, setAssignBranchOpen] = useState(false);
-    const [selectedPositionId, setSelectedPositionId] = useState<string>('');
-    const [selectedBranchId, setSelectedBranchId] = useState<string>('');
-    const [selectedSiteId, setSelectedSiteId] = useState<string>('');
+    const [selectedPositionId, setSelectedPositionId] = useState('');
+    const [selectedBranchId, setSelectedBranchId] = useState('');
+    const [selectedSiteId, setSelectedSiteId] = useState('');
     const [assignLoading, setAssignLoading] = useState(false);
 
-    // ── Archived pagination state (client‑side) ──────────────────────────────
+    // ── Archived pagination (client-side) ────────────────────────────────────
     const [archivedPage, setArchivedPage] = useState(1);
     const [archivedPerPage, setArchivedPerPage] = useState(10);
 
-    // ── Client‑side filtering of archived employees ─────────────────────────
+    // ── Client-side filtering of archived employees ──────────────────────────
     const filteredArchivedEmployees = useMemo(() => {
         let filtered = [...archivedEmployees];
-
         if (archivedSearchTerm.trim()) {
             const term = archivedSearchTerm.trim().toLowerCase();
-            filtered = filtered.filter(emp =>
-                String(emp.emp_code).toLowerCase().includes(term) ||
-                emp.user?.name?.toLowerCase().includes(term)
+            filtered = filtered.filter(
+                emp =>
+                    String(emp.emp_code).toLowerCase().includes(term) ||
+                    emp.user?.name?.toLowerCase().includes(term),
             );
         }
-
         if (archivedSelectedPositions.length > 0) {
-            filtered = filtered.filter(emp =>
-                emp.position && archivedSelectedPositions.includes(emp.position.pos_name)
+            filtered = filtered.filter(
+                emp => emp.position && archivedSelectedPositions.includes(emp.position.pos_name),
             );
         }
-
         if (archivedSelectedBranch) {
-            filtered = filtered.filter(emp =>
-                emp.branch?.branch_name === archivedSelectedBranch
-            );
+            filtered = filtered.filter(emp => emp.branch?.branch_name === archivedSelectedBranch);
         }
-
         if (archivedSelectedSite) {
-            filtered = filtered.filter(emp =>
-                emp.site?.site_name === archivedSelectedSite
-            );
+            filtered = filtered.filter(emp => emp.site?.site_name === archivedSelectedSite);
         }
-
         return filtered;
     }, [archivedEmployees, archivedSearchTerm, archivedSelectedPositions, archivedSelectedBranch, archivedSelectedSite]);
 
-    // Paginate the filtered archived list
     const paginatedArchived = useMemo(() => {
         const start = (archivedPage - 1) * archivedPerPage;
-        const end = start + archivedPerPage;
-        return filteredArchivedEmployees.slice(start, end);
+        return filteredArchivedEmployees.slice(start, start + archivedPerPage);
     }, [filteredArchivedEmployees, archivedPage, archivedPerPage]);
 
     const archivedTotal = filteredArchivedEmployees.length;
-    const archivedLastPage = Math.ceil(archivedTotal / archivedPerPage);
+    const archivedLastPage = Math.max(1, Math.ceil(archivedTotal / archivedPerPage));
     const archivedFrom = archivedTotal === 0 ? 0 : (archivedPage - 1) * archivedPerPage + 1;
     const archivedTo = Math.min(archivedPage * archivedPerPage, archivedTotal);
 
-    // Generate pagination links for archived (client‑side)
     const archivedLinks = useMemo(() => {
         const links = [];
         const maxVisible = 5;
         let startPage = Math.max(1, archivedPage - Math.floor(maxVisible / 2));
         let endPage = Math.min(archivedLastPage, startPage + maxVisible - 1);
-        if (endPage - startPage + 1 < maxVisible) {
-            startPage = Math.max(1, endPage - maxVisible + 1);
-        }
-        links.push({
-            url: archivedPage > 1 ? '#' : null,
-            label: '&laquo; Previous',
-            active: false,
-        });
+        if (endPage - startPage + 1 < maxVisible) startPage = Math.max(1, endPage - maxVisible + 1);
+        links.push({ url: archivedPage > 1 ? '#' : null, label: '&laquo; Previous', active: false });
         for (let i = startPage; i <= endPage; i++) {
-            links.push({
-                url: '#',
-                label: String(i),
-                active: i === archivedPage,
-            });
+            links.push({ url: '#', label: String(i), active: i === archivedPage });
         }
-        links.push({
-            url: archivedPage < archivedLastPage ? '#' : null,
-            label: 'Next &raquo;',
-            active: false,
-        });
+        links.push({ url: archivedPage < archivedLastPage ? '#' : null, label: 'Next &raquo;', active: false });
         return links;
     }, [archivedPage, archivedLastPage]);
 
@@ -272,24 +227,24 @@ export default function Index({
         links: archivedLinks,
     };
 
-    // ── Compute button visibility (active tab only) ─────────────────────────
+    // ── Button visibility ────────────────────────────────────────────────────
     const currentPageEmployees = employees.data;
 
-    const hasAnyMissingPosition = useMemo(() => {
-        return selectedIds.some(id => {
-            const emp = currentPageEmployees.find(e => e.id === id);
-            return emp && !emp.position;
-        });
-    }, [selectedIds, currentPageEmployees]);
+    const hasAnyMissingPosition = useMemo(
+        () => selectedIds.some(id => currentPageEmployees.find(e => e.id === id) && !currentPageEmployees.find(e => e.id === id)?.position),
+        [selectedIds, currentPageEmployees],
+    );
 
-    const hasAnyMissingBranchOrSite = useMemo(() => {
-        return selectedIds.some(id => {
-            const emp = currentPageEmployees.find(e => e.id === id);
-            return emp && (!emp.branch || !emp.site);
-        });
-    }, [selectedIds, currentPageEmployees]);
+    const hasAnyMissingBranchOrSite = useMemo(
+        () =>
+            selectedIds.some(id => {
+                const emp = currentPageEmployees.find(e => e.id === id);
+                return emp && (!emp.branch || !emp.site);
+            }),
+        [selectedIds, currentPageEmployees],
+    );
 
-    // ── Central navigation function for active tab ──────────────────────────
+    // ── Central navigation (active tab, server-side) ─────────────────────────
     function applyFilters(
         overrides: Partial<{
             search: string;
@@ -301,42 +256,37 @@ export default function Index({
             to: Date | undefined;
             perPage: string;
             showArchived: boolean;
-        }> = {}
+        }> = {},
     ) {
-        const s = overrides.search ?? searchTerm;
+        const s   = overrides.search    ?? searchTerm;
         const pos = overrides.positions ?? selectedPositions;
-        const br = overrides.branch ?? selectedBranch;
-        const si = overrides.site ?? selectedSite;
-        const st = overrides.status ?? status;
+        const br  = overrides.branch    ?? selectedBranch;
+        const si  = overrides.site      ?? selectedSite;
+        const st  = overrides.status ?? status;
         const from = overrides.from !== undefined ? overrides.from : dateFrom;
-        const to = overrides.to !== undefined ? overrides.to : dateTo;
-        const pp = overrides.perPage ?? String(employees.perPage ?? 10);
+        const to   = overrides.to   !== undefined ? overrides.to   : dateTo;
+        const pp   = overrides.perPage  ?? String(employees.perPage ?? 10);
         const showArchived = overrides.showArchived !== undefined ? overrides.showArchived : activeTab === 'archived';
 
         const params: Record<string, string> = {};
-        if (s.trim()) params.search = s.trim();
-        if (pos.length) params.positions = pos.join(',');
-        if (br) params.branch = br;
-        if (si) params.site = si;
-        if (st) params.status = st;
-        if (from) params.date_from = format(from, 'yyyy-MM-dd');
-        if (to) params.date_to = format(to, 'yyyy-MM-dd');
+        if (s.trim())    params.search    = s.trim();
+        if (pos.length)  params.positions = pos.join(',');
+        if (br)          params.branch    = br;
+        if (si)          params.site      = si;
+        if (st)          params.status    = st;
+        if (from)        params.date_from = format(from, 'yyyy-MM-dd');
+        if (to)          params.date_to   = format(to, 'yyyy-MM-dd');
         if (pp && pp !== '10') params.perPage = pp;
         if (showArchived) params.show_archived = 'true';
 
-        router.get('/employees', params, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
+        router.get('/employees', params, { preserveState: true, preserveScroll: true, replace: true });
     }
 
-    // ── Tab change handler ───────────────────────────────────────────────────
+    // ── Tab change ───────────────────────────────────────────────────────────
     const handleTabChange = (value: string) => {
         const newTab = value as 'active' | 'archived';
         setActiveTab(newTab);
         setSelectedIds([]);
-
         if (newTab === 'active') {
             applyFilters({ showArchived: false });
         } else {
@@ -344,14 +294,13 @@ export default function Index({
         }
     };
 
-    // ── Active tab filter handlers (server‑side) ────────────────────────────
+    // ── Active tab handlers ──────────────────────────────────────────────────
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const handleSearchChange = (value: string) => {
         setSearchTerm(value);
         if (searchTimer.current) clearTimeout(searchTimer.current);
-        searchTimer.current = setTimeout(() => {
-            applyFilters({ search: value });
-        }, 300);
+        searchTimer.current = setTimeout(() => applyFilters({ search: value }), 300);
     };
 
     const handleBranchChange = (branch: string) => {
@@ -385,9 +334,7 @@ export default function Index({
         applyFilters({ to });
     };
 
-    const handlePerPageChange = (value: string) => {
-        applyFilters({ perPage: value });
-    };
+    const handlePerPageChange = (value: string) => applyFilters({ perPage: value });
 
     const clearActiveFilters = () => {
         setSearchTerm('');
@@ -399,43 +346,22 @@ export default function Index({
         setDateTo(undefined);
         router.get(
             '/employees',
-            { show_archived: activeTab === 'archived' ? 'true' : undefined },
-            { preserveState: true, replace: true }
+            activeTab === 'archived' ? { show_archived: 'true' } : {},
+            { preserveState: true, replace: true },
         );
     };
 
-    // ── Archived tab specific: position options (from archived employees) ───
+    // ── Archived tab filter handlers ─────────────────────────────────────────
     const archivePositions = useMemo(() => {
         const positions = new Set<string>();
-        archivedEmployees.forEach(emp => {
-            if (emp.position?.pos_name) {
-                positions.add(emp.position.pos_name);
-            }
-        });
+        archivedEmployees.forEach(emp => { if (emp.position?.pos_name) positions.add(emp.position.pos_name); });
         return Array.from(positions).sort();
     }, [archivedEmployees]);
 
-    // ── Archived tab filter handlers (client‑side) ──────────────────────────
-    const handleArchivedSearchChange = (value: string) => {
-        setArchivedSearchTerm(value);
-        setArchivedPage(1);
-    };
-
-    const handleArchivedPositionsChange = (positions: string[]) => {
-        setArchivedSelectedPositions(positions);
-        setArchivedPage(1);
-    };
-
-    const handleArchivedBranchChange = (branch: string) => {
-        setArchivedSelectedBranch(branch);
-        setArchivedSelectedSite('');
-        setArchivedPage(1);
-    };
-
-    const handleArchivedSiteChange = (site: string) => {
-        setArchivedSelectedSite(site);
-        setArchivedPage(1);
-    };
+    const handleArchivedSearchChange   = (value: string)     => { setArchivedSearchTerm(value);             setArchivedPage(1); };
+    const handleArchivedPositionsChange = (pos: string[])    => { setArchivedSelectedPositions(pos);        setArchivedPage(1); };
+    const handleArchivedBranchChange   = (branch: string)    => { setArchivedSelectedBranch(branch); setArchivedSelectedSite(''); setArchivedPage(1); };
+    const handleArchivedSiteChange     = (site: string)      => { setArchivedSelectedSite(site);            setArchivedPage(1); };
 
     const clearArchivedFilters = () => {
         setArchivedSearchTerm('');
@@ -445,156 +371,96 @@ export default function Index({
         setArchivedPage(1);
     };
 
-    // ── Bulk archive ────────────────────────────────────────────────────────
-    const handleBulkArchive = () => {
-        if (selectedIds.length === 0) return;
-        setBulkArchiveConfirmOpen(true);
-    };
+    // ── Active filter count ──────────────────────────────────────────────────
+    const activeFiltersCount = [
+        searchTerm.trim(),
+        ...selectedPositions,
+        selectedBranch,
+        selectedSite,
+        status,
+        dateFrom,
+        dateTo,
+    ].filter(Boolean).length;
+
+    // ── Bulk archive ─────────────────────────────────────────────────────────
+    const handleBulkArchive = () => { if (selectedIds.length) setBulkArchiveConfirmOpen(true); };
 
     const confirmBulkArchive = () => {
-        if (selectedIds.length === 0) return;
+        if (!selectedIds.length) return;
         setBulkLoading(true);
-        router.post('/employees/bulk-destroy', {
-            ids: selectedIds,
-            _method: 'DELETE',
-        }, {
-            onSuccess: () => {
-                // Flash message will be shown by global useEffect
-                setBulkArchiveConfirmOpen(false);
-                setSelectedIds([]);
-            },
-            onError: (errors) => {
-                const errorMessage = Object.values(errors).flat()[0] || 'Failed to archive employees.';
-                toast.error(errorMessage, toastStyle('#dc2626'));
-            },
+        router.post('/employees/bulk-destroy', { ids: selectedIds, _method: 'DELETE' }, {
+            onSuccess: () => { setBulkArchiveConfirmOpen(false); setSelectedIds([]); },
+            onError: (errors) => toast.error(Object.values(errors).flat()[0] || 'Failed to archive employees.', toastStyle('#dc2626')),
             onFinish: () => setBulkLoading(false),
         });
     };
 
-    // ── Bulk assign handlers ────────────────────────────────────────────────
-    const handleAssignPosition = () => {
-        setSelectedPositionId('');
-        setAssignPositionOpen(true);
-    };
+    // ── Bulk assign position ─────────────────────────────────────────────────
+    const handleAssignPosition = () => { setSelectedPositionId(''); setAssignPositionOpen(true); };
 
     const confirmAssignPosition = () => {
-        if (!selectedPositionId) {
-            toast.error('Please select a position');
-            return;
-        }
+        if (!selectedPositionId) { toast.error('Please select a position'); return; }
         setAssignLoading(true);
-        router.post('/employees/bulk-assign-position', {
-            ids: selectedIds,
-            position_id: selectedPositionId,
-        }, {
-            onSuccess: () => {
-                // Flash message will be shown by global useEffect
-                setAssignPositionOpen(false);
-                setSelectedIds([]);
-            },
-            onError: (errors) => {
-                const errorMessage = Object.values(errors).flat()[0] || 'Failed to assign position.';
-                toast.error(errorMessage, toastStyle('#dc2626'));
-            },
+        router.post('/employees/bulk-assign-position', { ids: selectedIds, position_id: selectedPositionId }, {
+            onSuccess: () => { setAssignPositionOpen(false); setSelectedIds([]); },
+            onError: (errors) => toast.error(Object.values(errors).flat()[0] || 'Failed to assign position.', toastStyle('#dc2626')),
             onFinish: () => setAssignLoading(false),
         });
     };
 
-    const handleAssignBranchSite = () => {
-        setSelectedBranchId('');
-        setSelectedSiteId('');
-        setAssignBranchOpen(true);
-    };
+    // ── Bulk assign branch/site ──────────────────────────────────────────────
+    const handleAssignBranchSite = () => { setSelectedBranchId(''); setSelectedSiteId(''); setAssignBranchOpen(true); };
 
     const availableSites = useMemo(() => {
         if (!selectedBranchId) return [];
-        const branchWithSites = activeBranchesData.find(b => b.id === Number(selectedBranchId));
-        return branchWithSites?.sites ?? [];
+        return activeBranchesData.find(b => b.id === Number(selectedBranchId))?.sites ?? [];
     }, [selectedBranchId, activeBranchesData]);
 
     const confirmAssignBranchSite = () => {
-        if (!selectedBranchId) {
-            toast.error('Please select a branch');
-            return;
-        }
+        if (!selectedBranchId) { toast.error('Please select a branch'); return; }
         setAssignLoading(true);
         router.post('/employees/bulk-assign-branch-site', {
             ids: selectedIds,
             branch_id: selectedBranchId,
             site_id: selectedSiteId === '' ? null : selectedSiteId,
         }, {
-            onSuccess: () => {
-                // Flash message will be shown by global useEffect
-                setAssignBranchOpen(false);
-                setSelectedIds([]);
-            },
-            onError: (errors) => {
-                const errorMessage = Object.values(errors).flat()[0] || 'Failed to assign branch and site.';
-                toast.error(errorMessage, toastStyle('#dc2626'));
-            },
+            onSuccess: () => { setAssignBranchOpen(false); setSelectedIds([]); },
+            onError: (errors) => toast.error(Object.values(errors).flat()[0] || 'Failed to assign branch and site.', toastStyle('#dc2626')),
             onFinish: () => setAssignLoading(false),
         });
     };
 
-    // ── Restore handlers ────────────────────────────────────────────────────
+    // ── Restore ──────────────────────────────────────────────────────────────
     const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
     const [itemToRestore, setItemToRestore] = useState<Employee | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
     const [bulkRestoreConfirmOpen, setBulkRestoreConfirmOpen] = useState(false);
 
-    const handleRestoreClick = (employee: Employee) => {
-        setItemToRestore(employee);
-        setRestoreDialogOpen(true);
-    };
+    const handleRestoreClick = (employee: Employee) => { setItemToRestore(employee); setRestoreDialogOpen(true); };
 
     const confirmSingleRestore = () => {
         if (!itemToRestore) return;
         setIsRestoring(true);
-        router.put(
-            route('employees.restore', itemToRestore.slug_emp),
-            {},
-            {
-                onSuccess: () => {
-                    // Flash message will be shown by global useEffect
-                    setRestoreDialogOpen(false);
-                    setItemToRestore(null);
-                    setSelectedIds([]);
-                },
-                onError: (errors) => {
-                    const errorMessage = Object.values(errors).flat()[0] || 'Restore failed';
-                    toast.error(errorMessage, toastStyle('#dc2626'));
-                },
-                onFinish: () => setIsRestoring(false),
-            }
-        );
+        router.put(route('employees.restore', itemToRestore.slug_emp), {}, {
+            onSuccess: () => { setRestoreDialogOpen(false); setItemToRestore(null); setSelectedIds([]); },
+            onError: (errors) => toast.error(Object.values(errors).flat()[0] || 'Restore failed', toastStyle('#dc2626')),
+            onFinish: () => setIsRestoring(false),
+        });
     };
 
-    const handleBulkRestoreClick = () => {
-        if (selectedIds.length === 0) return;
-        setBulkRestoreConfirmOpen(true);
-    };
+    const handleBulkRestoreClick = () => { if (selectedIds.length) setBulkRestoreConfirmOpen(true); };
 
     const confirmBulkRestore = () => {
-        if (selectedIds.length === 0) return;
+        if (!selectedIds.length) return;
         setBulkLoading(true);
-        router.post('/employees/bulk-restore', {
-            ids: selectedIds,
-            _method: 'PUT',
-        }, {
-            onSuccess: () => {
-                // Flash message will be shown by global useEffect
-                setBulkRestoreConfirmOpen(false);
-                setSelectedIds([]);
-            },
-            onError: (errors) => {
-                const errorMessage = Object.values(errors).flat()[0] || 'Failed to restore employees.';
-                toast.error(errorMessage, toastStyle('#dc2626'));
-            },
+        router.post('/employees/bulk-restore', { ids: selectedIds, _method: 'PUT' }, {
+            onSuccess: () => { setBulkRestoreConfirmOpen(false); setSelectedIds([]); },
+            onError: (errors) => toast.error(Object.values(errors).flat()[0] || 'Failed to restore employees.', toastStyle('#dc2626')),
             onFinish: () => setBulkLoading(false),
         });
     };
 
-    // ── Single delete confirmation ──────────────────────────────────────────
+    // ── Delete ───────────────────────────────────────────────────────────────
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -604,53 +470,26 @@ export default function Index({
         { label: 'Restore', icon: 'RotateCcw', route: null },
     ];
 
-    const handleDeleteClick = (employee: Employee) => {
-        setItemToDelete(employee);
-        setDeleteDialogOpen(true);
-    };
+    const handleDeleteClick = (employee: Employee) => { setItemToDelete(employee); setDeleteDialogOpen(true); };
 
     const confirmDelete = () => {
         if (!itemToDelete) return;
         setIsDeleting(true);
         const destroyUrl = EmployeeController.destroy(itemToDelete.slug_emp).url;
         destroy(destroyUrl, {
-            onSuccess: () => {
-                // Flash message will be shown by global useEffect
-                setDeleteDialogOpen(false);
-                setItemToDelete(null);
-            },
-            onError: (errors) => {
-                const errorMessage = Object.values(errors).flat()[0] || 'Failed to delete employee';
-                toast.error(errorMessage, toastStyle('#dc2626'));
-            },
+            onSuccess: () => { setDeleteDialogOpen(false); setItemToDelete(null); },
+            onError: (errors) => toast.error(Object.values(errors).flat()[0] || 'Failed to delete employee', toastStyle('#dc2626')),
             onFinish: () => setIsDeleting(false),
         });
     };
 
-    const handleView = (employee: Employee) => {
-        router.get(EmployeeController.show(employee.slug_emp).url);
-    };
-
-    const handleEdit = (employee: Employee) => {
-        router.get(EmployeeController.edit(employee.slug_emp).url);
-    };
-
-    // ── Helper: active filters count for active tab ─────────────────────────
-    const activeFiltersCount = [
-        searchTerm.trim(),
-        ...selectedPositions,
-        selectedBranch,
-        selectedSite,
-        status !== '',
-        dateFrom,
-        dateTo,
-    ].filter(Boolean).length;
+    const handleView = (employee: Employee) => router.get(EmployeeController.show(employee.slug_emp).url);
+    const handleEdit = (employee: Employee) => router.get(EmployeeController.edit(employee.slug_emp).url);
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Employees" />
-            {/* <CustomToast /> */}
 
             <style>{`
                 @keyframes fadeUp {
@@ -672,7 +511,6 @@ export default function Index({
                     title="Employees"
                     description="Manage your workforce: add, edit, and organize employee records with ease."
                 />
-
                 <Link href="/employees/create">
                     <Button className="hover:cursor-pointer flex ml-auto">
                         <UserPlus className="h-5 w-5" />
@@ -686,99 +524,64 @@ export default function Index({
             <div className="flex flex-1 flex-col gap-4 p-4 pp-row">
                 <div className="mx-4">
                     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                        {/* Mobile View (below 640px) */}
+
+                        {/* Mobile View */}
                         <div className="block sm:hidden">
                             <TabsList className="grid w-full grid-cols-2 gap-2 bg-transparent p-0">
-                                <TabsTrigger
-                                    value="active"
-                                    className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                                >
+                                <TabsTrigger value="active" className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                                     <UsersRound className="h-5 w-5" />
                                     <div className="flex items-center gap-1">
                                         <span className="text-xs font-medium">Active</span>
-                                        <Badge
-                                            variant="secondary"
-                                            className="text-[10px] px-1.5 py-0 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-                                        >
-                                            {totalCount}
-                                        </Badge>
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{totalCount}</Badge>
                                     </div>
                                 </TabsTrigger>
-                                <TabsTrigger
-                                    value="archived"
-                                    className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                                >
+                                <TabsTrigger value="archived" className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                                     <Archive className="h-5 w-5" />
                                     <div className="flex items-center gap-1">
                                         <span className="text-xs font-medium">Archived</span>
-                                        <Badge
-                                            variant="secondary"
-                                            className="text-[10px] px-1.5 py-0 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-                                        >
-                                            {archivedEmployees.length}
-                                        </Badge>
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{archivedEmployees.length}</Badge>
                                     </div>
                                 </TabsTrigger>
                             </TabsList>
                         </div>
 
-                        {/* Tablet View (640px to 1024px) */}
+                        {/* Tablet View */}
                         <div className="hidden sm:block lg:hidden">
                             <TabsList className="grid w-full grid-cols-2 gap-2 bg-transparent p-0">
-                                <TabsTrigger
-                                    value="active"
-                                    className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                                >
+                                <TabsTrigger value="active" className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                                     <UsersRound className="h-5 w-5" />
                                     <div className="flex items-center gap-1">
                                         <span className="text-xs font-medium">Active</span>
-                                        <Badge
-                                            variant="secondary"
-                                            className="text-[10px] px-1.5 py-0 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-                                        >
-                                            {totalCount}
-                                        </Badge>
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{totalCount}</Badge>
                                     </div>
                                 </TabsTrigger>
-                                <TabsTrigger
-                                    value="archived"
-                                    className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                                >
+                                <TabsTrigger value="archived" className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                                     <Archive className="h-5 w-5" />
                                     <div className="flex items-center gap-1">
                                         <span className="text-xs font-medium">Archived</span>
-                                        <Badge
-                                            variant="secondary"
-                                            className="text-[10px] px-1.5 py-0 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-                                        >
-                                            {archivedEmployees.length}
-                                        </Badge>
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{archivedEmployees.length}</Badge>
                                     </div>
                                 </TabsTrigger>
                             </TabsList>
                         </div>
 
-                        {/* Desktop View (above 1024px) - Your original */}
+                        {/* Desktop View */}
                         <div className="hidden lg:block">
                             <TabsList className="flex w-full max-w-md grid-cols-2 border-1">
                                 <TabsTrigger value="active" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:cursor-default data-[state=active]:text-primary-foreground rounded-lg transition-all cursor-pointer">
                                     <UsersRound className="h-4 w-4" />
                                     Active Employees
-                                    <Badge variant="secondary" className="ml-2 data-[state=active]:bg-white/20 data-[state=active]:text-white">
-                                        {totalCount}
-                                    </Badge>
+                                    <Badge variant="secondary" className="ml-2">{totalCount}</Badge>
                                 </TabsTrigger>
                                 <TabsTrigger value="archived" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:cursor-default data-[state=active]:text-primary-foreground rounded-lg transition-all cursor-pointer">
                                     <Archive className="h-4 w-4" />
                                     Archived Employees
-                                    <Badge variant="secondary" className="ml-2 data-[state=active]:bg-white/20 data-[state=active]:text-white">
-                                        {archivedEmployees.length}
-                                    </Badge>
+                                    <Badge variant="secondary" className="ml-2">{archivedEmployees.length}</Badge>
                                 </TabsTrigger>
                             </TabsList>
                         </div>
 
-                        {/* Active Tab Content */}
+                        {/* ── Active Tab ──────────────────────────────────────────────────────── */}
                         <TabsContent value="active" className="mt-6">
                             {employees.total === 0 && activeFiltersCount === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -786,12 +589,8 @@ export default function Index({
                                         <Users className="h-12 w-12 text-gray-400" />
                                     </div>
                                     <h3 className="text-lg font-semibold mb-2">No employees yet</h3>
-                                    <p className="text-gray-500 mb-6 max-w-sm">
-                                        Get started by creating your first employee.
-                                    </p>
-                                    <Link href="/employees/create">
-                                        <Button>Create Your First Employee</Button>
-                                    </Link>
+                                    <p className="text-gray-500 mb-6 max-w-sm">Get started by creating your first employee.</p>
+                                    <Link href="/employees/create"><Button>Create Your First Employee</Button></Link>
                                 </div>
                             ) : (
                                 <>
@@ -807,43 +606,23 @@ export default function Index({
                                             </div>
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 {hasAnyMissingPosition && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={handleAssignPosition}
-                                                        className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
-                                                    >
-                                                        <Briefcase className="h-4 w-4 mr-1" />
-                                                        Assign Position
+                                                    <Button variant="outline" size="sm" onClick={handleAssignPosition} className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30">
+                                                        <Briefcase className="h-4 w-4 mr-1" />Assign Position
                                                     </Button>
                                                 )}
                                                 {hasAnyMissingBranchOrSite && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={handleAssignBranchSite}
-                                                        className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/30"
-                                                    >
-                                                        <Building2 className="h-4 w-4 mr-1" />
-                                                        Assign Branch & Site
+                                                    <Button variant="outline" size="sm" onClick={handleAssignBranchSite} className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/30">
+                                                        <Building2 className="h-4 w-4 mr-1" />Assign Branch & Site
                                                     </Button>
                                                 )}
-                                                <Button
-                                                    variant="destructive"
-                                                    size="sm"
-                                                    onClick={handleBulkArchive}
-                                                    disabled={bulkLoading}
-                                                    className="shadow-sm"
-                                                >
-                                                    <Archive className="h-4 w-4 mr-1" />
-                                                    Move to Archive
+                                                <Button variant="destructive" size="sm" onClick={handleBulkArchive} disabled={bulkLoading} className="shadow-sm">
+                                                    <Archive className="h-4 w-4 mr-1" />Move to Archive
                                                 </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
-                                                    Cancel
-                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Cancel</Button>
                                             </div>
                                         </div>
                                     )}
+
                                     <CustomTable
                                         title="Employee Lists"
                                         columns={EmployeesTableConfig.columns}
@@ -859,14 +638,7 @@ export default function Index({
                                         selectAll={selectedIds.length === employees.data.length && employees.data.length > 0}
                                         toolbar={
                                             <EmployeeFilterBar
-                                                filters={{
-                                                    search: true,
-                                                    position: true,
-                                                    branch: true,
-                                                    site: true,
-                                                    date: true,
-                                                    status: true,
-                                                }}
+                                                filters={{ search: true, position: true, branch: true, site: true, date: true, status: true }}
                                                 allPositions={allPositions}
                                                 branchesData={activeBranchesData}
                                                 searchTerm={searchTerm}
@@ -893,24 +665,23 @@ export default function Index({
                                                 <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
                                                     <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                                                 </div>
-                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                                    No results found
-                                                </h3>
+                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No results found</h3>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
                                                     {searchTerm && selectedPositions.length > 0
                                                         ? `No employees matching "${searchTerm}" in selected positions.`
                                                         : searchTerm
-                                                            ? `No employees matching "${searchTerm}".`
-                                                            : selectedBranch && selectedSite                                                                ? `No employees in ${selectedBranch} / ${selectedSite}.`
-                                                                : selectedBranch
-                                                                    ? `No employees in ${selectedBranch}.`
-                                                                    : dateFrom || dateTo
-                                                                        ? 'No employees in the selected date range.'
-                                                                        : 'No employees match your current filters.'}
+                                                        ? `No employees matching "${searchTerm}".`
+                                                        : selectedBranch && selectedSite
+                                                        ? `No employees in ${selectedBranch} / ${selectedSite}.`
+                                                        : selectedBranch
+                                                        ? `No employees in ${selectedBranch}.`
+                                                        : dateFrom || dateTo
+                                                        ? 'No employees in the selected date range.'
+                                                        : status
+                                                        ? 'No employees with the selected status.'
+                                                        : 'No employees match your current filters.'}
                                                 </p>
-                                                <Button variant="outline" size="sm" onClick={clearActiveFilters}>
-                                                    Clear filters
-                                                </Button>
+                                                <Button variant="outline" size="sm" onClick={clearActiveFilters}>Clear filters</Button>
                                             </div>
                                         }
                                     />
@@ -927,7 +698,7 @@ export default function Index({
                             )}
                         </TabsContent>
 
-                        {/* Archived Tab Content */}
+                        {/* ── Archived Tab ────────────────────────────────────────────────────── */}
                         <TabsContent value="archived" className="mt-6">
                             {archivedEmployees.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -935,9 +706,7 @@ export default function Index({
                                         <Archive className="h-12 w-12 text-gray-400" />
                                     </div>
                                     <h3 className="text-lg font-semibold mb-2">No archived employees</h3>
-                                    <p className="text-gray-500 mb-2 max-w-sm">
-                                        Archived employees will appear here when you delete them.
-                                    </p>
+                                    <p className="text-gray-500 mb-2 max-w-sm">Archived employees will appear here when you delete them.</p>
                                 </div>
                             ) : (
                                 <>
@@ -952,21 +721,14 @@ export default function Index({
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    onClick={handleBulkRestoreClick}
-                                                    disabled={bulkLoading}
-                                                    className="bg-green-600 hover:bg-green-700 text-white shadow-sm focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                                                >
-                                                    <RotateCcw className="h-4 w-4 mr-1" />
-                                                    Restore
+                                                <Button size="sm" onClick={handleBulkRestoreClick} disabled={bulkLoading} className="bg-green-600 hover:bg-green-700 text-white shadow-sm">
+                                                    <RotateCcw className="h-4 w-4 mr-1" />Restore
                                                 </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
-                                                    Cancel
-                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Cancel</Button>
                                             </div>
                                         </div>
                                     )}
+
                                     <CustomTable
                                         title="Archived Employee Lists"
                                         columns={EmployeesTableConfig.columns}
@@ -983,14 +745,7 @@ export default function Index({
                                         selectAll={selectedIds.length === paginatedArchived.length && paginatedArchived.length > 0}
                                         toolbar={
                                             <EmployeeFilterBar
-                                                filters={{
-                                                    search: true,
-                                                    position: true,
-                                                    branch: true,
-                                                    site: true,
-                                                    status: false,
-                                                    date: false,
-                                                }}
+                                                filters={{ search: true, position: true, branch: true, site: true, status: false, date: false }}
                                                 allPositions={archivePositions}
                                                 branchesData={archivedBranchesData}
                                                 searchTerm={archivedSearchTerm}
@@ -998,15 +753,12 @@ export default function Index({
                                                 selectedBranch={archivedSelectedBranch}
                                                 selectedSite={archivedSelectedSite}
                                                 status=""
-                                                dateFrom={undefined}
-                                                dateTo={undefined}
                                                 onSearchChange={handleArchivedSearchChange}
                                                 onPositionsChange={handleArchivedPositionsChange}
                                                 onBranchChange={handleArchivedBranchChange}
                                                 onSiteChange={handleArchivedSiteChange}
                                                 onClearAll={clearArchivedFilters}
                                                 searchPlaceholder="Search archived employees..."
-                                                dateLabel="Deletion Date"
                                             />
                                         }
                                         filterEmptyState={
@@ -1014,33 +766,21 @@ export default function Index({
                                                 <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
                                                     <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                                                 </div>
-                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                                    No archived employees found
-                                                </h3>
+                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No archived employees found</h3>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                    {archivedSearchTerm && archivedSelectedPositions.length > 0
-                                                        ? `No archived employees matching "${archivedSearchTerm}" in selected positions.`
-                                                        : archivedSearchTerm
-                                                            ? `No archived employees matching "${archivedSearchTerm}".`
-                                                            : archivedSelectedBranch && archivedSelectedSite
-                                                                ? `No archived employees in ${archivedSelectedBranch} / ${archivedSelectedSite}.`
-                                                                : archivedSelectedBranch
-                                                                    ? `No archived employees in ${archivedSelectedBranch}.`
-                                                                    : 'No archived employees match your current filters.'}
+                                                    {archivedSearchTerm ? `No archived employees matching "${archivedSearchTerm}".`
+                                                        : archivedSelectedBranch && archivedSelectedSite ? `No archived employees in ${archivedSelectedBranch} / ${archivedSelectedSite}.`
+                                                        : archivedSelectedBranch ? `No archived employees in ${archivedSelectedBranch}.`
+                                                        : 'No archived employees match your current filters.'}
                                                 </p>
-                                                <Button variant="outline" size="sm" onClick={clearArchivedFilters}>
-                                                    Clear filters
-                                                </Button>
+                                                <Button variant="outline" size="sm" onClick={clearArchivedFilters}>Clear filters</Button>
                                             </div>
                                         }
                                     />
                                     <CustomPagination
                                         pagination={archivedPagination}
                                         perPage={String(archivedPerPage)}
-                                        onPerPageChange={value => {
-                                            setArchivedPerPage(parseInt(value, 10));
-                                            setArchivedPage(1);
-                                        }}
+                                        onPerPageChange={value => { setArchivedPerPage(parseInt(value, 10)); setArchivedPage(1); }}
                                         onPageChange={page => setArchivedPage(page)}
                                         totalCount={archivedTotal}
                                         filteredCount={archivedTotal}
@@ -1053,7 +793,7 @@ export default function Index({
                     </Tabs>
                 </div>
 
-                {/* Dialogs */}
+                {/* ── Dialogs ──────────────────────────────────────────────────────────── */}
                 <DeleteConfirmationDialog
                     isOpen={deleteDialogOpen}
                     onClose={() => setDeleteDialogOpen(false)}
@@ -1062,7 +802,6 @@ export default function Index({
                     itemName={itemToDelete?.user?.name}
                     isLoading={isDeleting}
                 />
-
                 <DeleteConfirmationDialog
                     isOpen={bulkArchiveConfirmOpen}
                     onClose={() => setBulkArchiveConfirmOpen(false)}
@@ -1074,18 +813,13 @@ export default function Index({
                     icon={<Archive className="h-5 w-5" />}
                     variant="warning"
                 />
-
                 <RestoreConfirmationDialog
                     isOpen={restoreDialogOpen}
-                    onClose={() => {
-                        setRestoreDialogOpen(false);
-                        setItemToRestore(null);
-                    }}
+                    onClose={() => { setRestoreDialogOpen(false); setItemToRestore(null); }}
                     onConfirm={confirmSingleRestore}
                     itemName={itemToRestore?.user?.name || itemToRestore?.emp_code || 'this employee'}
                     isLoading={isRestoring}
                 />
-
                 <RestoreConfirmationDialog
                     isOpen={bulkRestoreConfirmOpen}
                     onClose={() => setBulkRestoreConfirmOpen(false)}
@@ -1099,34 +833,23 @@ export default function Index({
                 {/* Assign Position Modal */}
                 <Dialog open={assignPositionOpen} onOpenChange={setAssignPositionOpen}>
                     <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Assign Position</DialogTitle>
-                        </DialogHeader>
+                        <DialogHeader><DialogTitle>Assign Position</DialogTitle></DialogHeader>
                         <div className="py-4">
                             <Select value={selectedPositionId} onValueChange={setSelectedPositionId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a position" />
-                                </SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Select a position" /></SelectTrigger>
                                 <SelectContent>
                                     {positionsList.map(pos => (
-                                        <SelectItem key={pos.id} value={String(pos.id)}>
-                                            {pos.pos_name}
-                                        </SelectItem>
+                                        <SelectItem key={pos.id} value={String(pos.id)}>{pos.pos_name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground mt-2">
-                                This will assign the selected position to all {selectedIds.length} employee(s).
-                                Employees with an existing position will be skipped.
+                                This will assign the selected position to all {selectedIds.length} employee(s). Employees with an existing position will be skipped.
                             </p>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setAssignPositionOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={confirmAssignPosition} disabled={assignLoading}>
-                                {assignLoading ? 'Assigning...' : 'Assign'}
-                            </Button>
+                            <Button variant="outline" onClick={() => setAssignPositionOpen(false)}>Cancel</Button>
+                            <Button onClick={confirmAssignPosition} disabled={assignLoading}>{assignLoading ? 'Assigning...' : 'Assign'}</Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
@@ -1134,55 +857,32 @@ export default function Index({
                 {/* Assign Branch & Site Modal */}
                 <Dialog open={assignBranchOpen} onOpenChange={setAssignBranchOpen}>
                     <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Assign Branch & Site</DialogTitle>
-                        </DialogHeader>
+                        <DialogHeader><DialogTitle>Assign Branch & Site</DialogTitle></DialogHeader>
                         <div className="py-4 space-y-4">
-                            {/* Branch select (required) */}
                             <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select branch" />
-                                </SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
                                 <SelectContent>
                                     {allBranchesForAssign.map(branch => (
-                                        <SelectItem key={branch.id} value={String(branch.id)}>
-                                            {branch.branch_name}
-                                        </SelectItem>
+                                        <SelectItem key={branch.id} value={String(branch.id)}>{branch.branch_name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-
-                            {/* Site select (optional) */}
-                            <Select
-                                value={selectedSiteId}
-                                onValueChange={(value) => setSelectedSiteId(value === 'none' ? '' : value)}
-                                disabled={!selectedBranchId}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select site (optional)" />
-                                </SelectTrigger>
+                            <Select value={selectedSiteId} onValueChange={v => setSelectedSiteId(v === 'none' ? '' : v)} disabled={!selectedBranchId}>
+                                <SelectTrigger><SelectValue placeholder="Select site (optional)" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
                                     {availableSites.map(site => (
-                                        <SelectItem key={site.id} value={String(site.id)}>
-                                            {site.site_name}
-                                        </SelectItem>
+                                        <SelectItem key={site.id} value={String(site.id)}>{site.site_name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-
                             <p className="text-xs text-muted-foreground">
-                                This will assign the selected branch and (optionally) site to all {selectedIds.length} employee(s).
-                                Employees already having both will be skipped.
+                                This will assign the selected branch and (optionally) site to all {selectedIds.length} employee(s). Employees already having both will be skipped.
                             </p>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setAssignBranchOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={confirmAssignBranchSite} disabled={assignLoading}>
-                                {assignLoading ? 'Assigning...' : 'Assign'}
-                            </Button>
+                            <Button variant="outline" onClick={() => setAssignBranchOpen(false)}>Cancel</Button>
+                            <Button onClick={confirmAssignBranchSite} disabled={assignLoading}>{assignLoading ? 'Assigning...' : 'Assign'}</Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
