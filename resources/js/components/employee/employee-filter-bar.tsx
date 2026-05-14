@@ -7,9 +7,20 @@ import {
     MultiSelectPopover,
     SingleSelectPopover,
     DateRangePicker,
-    StatusFilter,
 } from '@/components/filters/filter-primitives';
 import { cn } from '@/lib/utils';
+
+// ─── Employee status enum (mirrors DB) ────────────────────────────────────────
+export const EMPLOYEE_STATUS_OPTIONS = [
+    { value: 'active',          label: 'Active' },
+    { value: 'end_of_contract', label: 'End of Contract' },
+    { value: 'awol',            label: 'AWOL' },
+    { value: 'terminated',      label: 'Terminated' },
+    { value: 'resigned',        label: 'Resigned' },
+    { value: 'newly_hired',     label: 'Newly Hired' },
+] as const;
+
+export type EmployeeStatusValue = typeof EMPLOYEE_STATUS_OPTIONS[number]['value'] | '';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface BranchData {
@@ -20,60 +31,55 @@ export interface BranchData {
 }
 
 export interface FilterConfig {
-    /** Show search input */
     search?: boolean;
-    /** Show position filter */
     position?: boolean;
-    /** Show branch filter */
     branch?: boolean;
-    /** Show site filter */
     site?: boolean;
-    /** Show date range filter */
     date?: boolean;
-    /** Show status filter (active/inactive) */
     status?: boolean;
 }
 
 interface EmployeeFilterBarProps {
     // Data
     allPositions?: string[];
-    allBranches?: string[];  // Add this for simple branch array
-    allSites?: string[];      // Add this for site filtering
+    allBranches?: string[];
+    allSites?: string[];
     branchesData?: BranchData[];
-    
+
     // Filter values
     searchTerm?: string;
     selectedPositions?: string[];
     selectedBranch?: string;
     selectedSite?: string;
-    status?: string;  // '' = all | 'active' | 'inactive'
+    /** Single employee_status enum value, or '' for "all" */
+    status?: string;
     dateFrom?: Date | undefined;
     dateTo?: Date | undefined;
-    
+
     // Change handlers
     onSearchChange?: (value: string) => void;
     onPositionsChange?: (positions: string[]) => void;
     onBranchChange?: (branch: string) => void;
     onSiteChange?: (site: string) => void;
+    /** Called with the selected enum value, or '' when cleared */
     onStatusChange?: (status: string) => void;
     onDateFromChange?: (date: Date | undefined) => void;
     onDateToChange?: (date: Date | undefined) => void;
-    
+
     // Clear all
     onClearAll?: () => void;
-    
+
     // Configuration
     filters?: FilterConfig;
     searchPlaceholder?: string;
-    /** Optional label for the date range picker (defaults to "Date") */
     dateLabel?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function EmployeeFilterBar({
     allPositions = [],
-    allBranches = [],  // Add this
-    allSites = [],      // Add this
+    allBranches = [],
+    allSites = [],
     branchesData = [],
     searchTerm = '',
     selectedPositions = [],
@@ -98,60 +104,49 @@ export function EmployeeFilterBar({
         date: true,
         status: true,
     },
-    searchPlaceholder = "Search...",
-    dateLabel = "Date",
+    searchPlaceholder = 'Search...',
+    dateLabel = 'Date',
 }: EmployeeFilterBarProps) {
 
-    // Create branch options from either allBranches or branchesData
+    // Branch options
     const branchOptions = useMemo(() => {
-        // If we have allBranches (simple string array)
-        if (allBranches && allBranches.length > 0) {
-            return allBranches.map(branch => ({ value: branch, label: branch }));
-        }
-        // Otherwise use branchesData
+        if (allBranches.length > 0) return allBranches.map(b => ({ value: b, label: b }));
         return branchesData.map(b => ({ value: b.branch_name, label: b.branch_name }));
     }, [allBranches, branchesData]);
 
-    // Get site options based on selected branch
+    // Site options based on selected branch
     const siteOptions = useMemo(() => {
         if (!selectedBranch) return [];
-        
-        // First try to get sites from branchesData
         const branch = branchesData.find(b => b.branch_name === selectedBranch);
-        if (branch && branch.sites && branch.sites.length > 0) {
-            return branch.sites.map(s => ({ value: s.site_name, label: s.site_name }));
-        }
-        
-        // If no sites in branchesData, use allSites
-        if (allSites && allSites.length > 0) {
-            return allSites.map(site => ({ value: site, label: site }));
-        }
-        
+        if (branch?.sites?.length) return branch.sites.map(s => ({ value: s.site_name, label: s.site_name }));
+        if (allSites.length > 0) return allSites.map(s => ({ value: s, label: s }));
         return [];
     }, [branchesData, selectedBranch, allSites]);
 
-    // Check if any filter is active
+    // All 6 enum statuses — always shown, no prop needed
+    const statusOptions = EMPLOYEE_STATUS_OPTIONS.map(o => ({ value: o.value, label: o.label }));
+
+    // Active filter detection
     const hasActiveFilters = !!(
-        (filters.search && searchTerm?.trim()) ||
-        (filters.position && selectedPositions.length) ||
-        (filters.branch && selectedBranch) ||
-        (filters.site && selectedSite) ||
-        (filters.status && status !== '') ||
-        (filters.date && (dateFrom || dateTo))
+        (filters.search   && searchTerm?.trim())       ||
+        (filters.position && selectedPositions.length)  ||
+        (filters.branch   && selectedBranch)            ||
+        (filters.site     && selectedSite)              ||
+        (filters.status   && status)                    ||
+        (filters.date     && (dateFrom || dateTo))
     );
 
-    // Count active filters for display
     const activeFilterCount = [
-        (filters.search && searchTerm?.trim()) ? 1 : 0,
-        (filters.position && selectedPositions.length) ? 1 : 0,
-        (filters.branch && selectedBranch) ? 1 : 0,
-        (filters.site && selectedSite) ? 1 : 0,
-        (filters.status && status !== '') ? 1 : 0,
-        (filters.date && (dateFrom || dateTo)) ? 1 : 0,
-    ].reduce((a, b) => a + b, 0);
+        filters.search   && searchTerm?.trim(),
+        filters.position && selectedPositions.length,
+        filters.branch   && selectedBranch,
+        filters.site     && selectedSite,
+        filters.status   && status,
+        filters.date     && (dateFrom || dateTo),
+    ].filter(Boolean).length;
 
-    // Check if there are any filters enabled besides search
-    const hasOtherFilters = filters.position || filters.branch || filters.site || filters.date || filters.status;
+    const hasOtherFilters =
+        filters.position || filters.branch || filters.site || filters.date || filters.status;
 
     return (
         <div className="flex items-center gap-2 flex-wrap">
@@ -164,7 +159,7 @@ export function EmployeeFilterBar({
                 />
             )}
 
-            {/* Divider - only show if search is shown and there are other filters */}
+            {/* Divider */}
             {filters.search && hasOtherFilters && (
                 <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 flex-shrink-0 mx-0.5" />
             )}
@@ -211,15 +206,19 @@ export function EmployeeFilterBar({
                     />
                 )}
 
+                {/* Status — single-select, all 6 enum values always present */}
                 {filters.status && onStatusChange && (
-                    <StatusFilter
-                        value={status as '' | 'active' | 'inactive'}
+                    <SingleSelectPopover
+                        label="Status"
+                        options={statusOptions}
+                        value={status}
                         onChange={onStatusChange}
+                        placeholder="Status"
                     />
                 )}
             </div>
 
-            {/* Clear all — only when something is active */}
+            {/* Clear all */}
             {hasActiveFilters && onClearAll && (
                 <button
                     onClick={onClearAll}

@@ -68,6 +68,7 @@ class UpdateEmployee
             'sss_number' => $data['sss_number'],
             'pagibig_number' => $data['pagibig_number'],
             'philhealth_number' => $data['philhealth_number'],
+            'tin_number' => $data['tin_number'],
             'pay_frequency' => $data['pay_frequency'] ?? 'monthly',
             'employee_status' => $data['employee_status'] ?? 'active',
         ]);
