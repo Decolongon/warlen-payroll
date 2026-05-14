@@ -112,6 +112,7 @@ class EmployeeRepository
                 'sss_number',
                 'pagibig_number',
                 'philhealth_number',
+                'tin_number',
                 'pay_frequency',
                 'employee_status',
             ]);
