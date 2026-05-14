@@ -1,7 +1,7 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
-import { Briefcase, HandCoins, Plus, Search } from 'lucide-react';
+import { Briefcase, HandCoins, Plus, X } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CardContent } from '@/components/ui/card';
@@ -426,10 +426,13 @@ export default function Index({
             <div className="flex flex-1 flex-col gap-4 p-4 mx-4">
                 <div className="flex justify-between items-center pp-header">
                     <CustomHeader title="Deductions" icon={<HandCoins className="h-6 w-6" />} description='Manage and track employee deductions' />
-                    <Link href={DeductionController.create()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap">
-                        <Plus className="h-4 w-4 mr-2" /> Add Deduction
-                    </Link>
+                    {deductions.total >= 1 && (
+                        <Link href={DeductionController.create()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap">
+                            <Plus className="h-4 w-4 mr-2" /> Add Deduction
+                        </Link>
+                    )}
                 </div>
+
 
                 <CardContent className="p-0 pp-row">
                     <CustomTable
@@ -442,6 +445,8 @@ export default function Index({
                         onEdit={handleEdit}
                         title="Deductions List"
                         isLoading={isLoading}
+                        hasActiveFilters={hasFilters}
+                        searchTerm={searchTerm}
                         toolbar={
                             <EmployeeFilterBar
                                 filters={{ search: true, position: false, branch: false, site: false, date: true, status: false }}
@@ -467,23 +472,30 @@ export default function Index({
                             />
                         }
                         emptyState={
-                            deductions.total === 0 && !hasFilters ? (
-                                <div className="flex flex-col items-center justify-center py-16">
-                                    <div className="rounded-full bg-primary/10 p-6 mb-4"><HandCoins className="h-12 w-12 text-primary" /></div>
-                                    <h3 className="text-xl font-semibold mb-2">No deductions yet</h3>
-                                    <p className="text-muted-foreground mb-4">Create your first deduction to get started</p>
-                                    <Link href={DeductionController.create()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap">Create First Deduction</Link>
+                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                    <HandCoins className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                                 </div>
-                            ) : currentData.length === 0 && hasFilters ? (
-                                <div className="flex flex-col items-center justify-center py-16">
-                                    <div className="rounded-full bg-muted p-6 mb-4"><Search className="h-12 w-12 text-muted-foreground" /></div>
-                                    <h3 className="text-xl font-semibold mb-2">No results found</h3>
-                                    <p className="text-muted-foreground mb-4">
-                                        No deductions match "{searchTerm}" {dateFrom || dateTo ? 'in the selected date range' : ''}
-                                    </p>
-                                    <Button variant="outline" onClick={clearFilters}>Clear all filters</Button>
-                                </div>
-                            ) : null
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No deduction yet.</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                    Start by adding your first employee deduction to manage payroll adjustments.
+                                </p>
+                                <Button onClick={() => router.get(DeductionController.create())} className="bg-[#1d4791] hover:bg-[#1d4791]/90 cursor-pointer">
+                                    <Plus />Add Deduction
+                                </Button>
+                            </div>
+                        }
+                        filterEmptyState={
+                           <div className="flex flex-col items-center justify-center py-16">
+								<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+									<X className="h-5 w-5 text-muted-foreground" />
+								</div>
+								<h3 className="text-sm font-semibold mb-2">No results found</h3>
+								<p className="text-xs text-muted-foreground mb-4">
+									No deductions match "{searchTerm}"
+								</p>
+								<Button variant="outline" className="cursor-pointer" onClick={clearFilters}>Clear all filters</Button>
+							</div>
                         }
                     />
 

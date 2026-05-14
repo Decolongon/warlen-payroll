@@ -2,7 +2,7 @@ import { Head, Link, usePage, router } from '@inertiajs/react';
 import {
     CalendarDays, Plus, Clock, CheckCircle2,
     AlertCircle, Filter, Pencil, Trash2, Eye, Calendar, XCircle, Loader2,
-    BadgeCheck,
+    BadgeCheck, Search
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import PayrollPeriodController from '@/actions/App/Http/Controllers/PayrollPeriodController';
@@ -18,6 +18,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { roundToNearestHours } from 'date-fns';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface PayrollPeriod {
@@ -56,8 +57,8 @@ const toastStyle = (color: string) => ({
 const getStatusConfig = (status: string) => {
     const configs: Record<string, {
         icon: any;
-        badge: string;      // classes for the badge (background, text, border)
-        dot: string;        // classes for the status dot
+        badge: string;
+        dot: string;
         color: 'primary' | 'secondary' | 'accent' | 'muted'
     }> = {
         open: {
@@ -96,7 +97,6 @@ const getStatusConfig = (status: string) => {
 };
 
 function StatusBadge({ status, label, isProcessing, progress }: { status: string; label: string; isProcessing?: boolean; progress?: number }) {
-    // Show loading spinner if this period is currently being processed
     if (isProcessing) {
         return (
             <div className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 bg-primary/10 border border-primary/20">
@@ -169,6 +169,9 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
     const [statusFilter, setStatusFilter] = useState<string>(() =>
         localStorage.getItem('payrollPeriods-statusFilter') || 'all'
     );
+    
+    // Add search state
+    const [searchTerm, setSearchTerm] = useState<string>('');
 
     // Simplified processing state
     const [processingPeriodId, setProcessingPeriodId] = useState<number | null>(null);
@@ -186,25 +189,23 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
         const now = Date.now();
         const last = lastFlashRef.current;
 
-        // If same flash key appeared within last 500ms, skip (prevents double toast)
         if (last.key === flashKey && (now - last.time) < 500) {
             return;
         }
 
-        // Update ref
         lastFlashRef.current = { key: flashKey, time: now };
 
         if (flash.success) {
-            toast.success(flash.success, toastStyle('#16a34a')); // green text
+            toast.success(flash.success, toastStyle('#16a34a'));
         }
         if (flash.error) {
-            toast.error(flash.error, toastStyle('#dc2626')); // red text
+            toast.error(flash.error, toastStyle('#dc2626'));
         }
         if (flash.warning) {
-            toast.warning(flash.warning, toastStyle('#f97316')); // orange text
+            toast.warning(flash.warning, toastStyle('#f97316'));
         }
         if (flash.info) {
-            toast.info(flash.info, toastStyle('#3b82f6')); // blue text
+            toast.info(flash.info, toastStyle('#3b82f6'));
         }
     }, [flash]);
 
@@ -217,15 +218,11 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
         if (!window.Echo) {
             return;
         }
-        
-        // Listen to payroll channel for general updates
+
         const payrollChannel = window.Echo.private('payroll');
         const payrollPeriodChannel = window.Echo.private('payroll-period');
 
-        // Handle payroll.completed events
         const handlePayrollEvent = (event: any) => {
-
-            // Check if this is a progress update
             if (event.progress !== undefined && event.payroll_period_id) {
                 const isStillProcessing = event.progress < 100;
 
@@ -233,52 +230,32 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                 setProcessingProgress(event.progress);
                 setProcessingMessage(event.message);
 
-                // If processing is complete, clear after delay
                 if (!isStillProcessing) {
                     setTimeout(() => {
-                       
                         setProcessingPeriodId(null);
                         setProcessingProgress(0);
                         setProcessingMessage('');
                     }, 3000);
                 }
-            } else {
-        
             }
 
-          
-            // Reload the page to get updated data
             router.reload({ only: ['payrollPeriods'] });
         };
 
-        // Subscribe to events
         payrollChannel.listen('.payroll.completed', handlePayrollEvent);
         payrollPeriodChannel.listen('.payroll.completed', handlePayrollEvent);
 
-        // Connection success handlers
-        payrollChannel.subscribed(() => {
-          
-        });
+        payrollChannel.subscribed(() => {});
+        payrollPeriodChannel.subscribed(() => {});
 
-        payrollPeriodChannel.subscribed(() => {
-          
-        });
-
-        // Error handlers
-        payrollChannel.error((error: any) => {
-          
-        });
-
-        payrollPeriodChannel.error((error: any) => {
-           
-        });
+        payrollChannel.error((error: any) => {});
+        payrollPeriodChannel.error((error: any) => {});
 
         return () => {
-            
             payrollChannel.stopListening('.payroll.completed');
             payrollPeriodChannel.stopListening('.payroll.completed');
         };
-    }, []); // Empty dependency array to run once
+    }, []);
 
     const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -287,12 +264,33 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
         return found?.label || status.charAt(0).toUpperCase() + status.slice(1);
     };
 
-    const filteredPeriods = useMemo(() =>
-        statusFilter === 'all'
-            ? payrollPeriods
-            : payrollPeriods.filter((p) => p.payroll_per_status === statusFilter),
-        [payrollPeriods, statusFilter]
-    );
+    // Filter by status AND search term
+    const filteredPeriods = useMemo(() => {
+        let filtered = payrollPeriods;
+        
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter((p) => p.payroll_per_status === statusFilter);
+        }
+        
+        // Apply search filter (search by period range)
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter((p) => {
+                const startDate = formatDate(p.start_date).toLowerCase();
+                const endDate = formatDate(p.end_date).toLowerCase();
+                const payDate = formatDate(p.pay_date).toLowerCase();
+                const status = formatStatus(p.payroll_per_status).toLowerCase();
+                
+                return startDate.includes(term) || 
+                       endDate.includes(term) || 
+                       payDate.includes(term) ||
+                       status.includes(term);
+            });
+        }
+        
+        return filtered;
+    }, [payrollPeriods, statusFilter, searchTerm]);
 
     // Generate counts based on enum values
     const counts = useMemo(() => {
@@ -300,7 +298,6 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
             all: payrollPeriods.length,
         };
 
-        // Add counts for each enum value
         payroll_period_enums?.forEach((enumItem) => {
             countsMap[enumItem.value] = payrollPeriods.filter(
                 (p) => p.payroll_per_status === enumItem.value
@@ -339,8 +336,6 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
             key: 'payroll_per_status',
             render: (row: PayrollPeriod) => {
                 const isProcessing = processingPeriodId === row.id;
-                // Log when rendering each row to see if condition matches
-              
                 return (
                     <StatusBadge
                         status={row.payroll_per_status}
@@ -365,7 +360,7 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
         },
     ];
 
-    // Actions – only View and Edit (Delete removed)
+    // Actions – View, Edit, and Run Payroll
     const actions = [
         { label: 'View', icon: 'Eye' as const },
         { label: 'Edit', icon: 'Pencil' as const },
@@ -392,7 +387,16 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
         );
     };
 
-    // Toolbar slot for the filter controls
+    // Handle search
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+    };
+
+    const handleSearchReset = () => {
+        setSearchTerm('');
+    };
+
+    // Toolbar slot for the filter controls with search
     const toolbar = (
         <div className="flex flex-wrap items-center justify-between gap-3">
             {processingPeriodId !== null && (
@@ -408,12 +412,17 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                     )}
                 </div>
             )}
+            
             <p className="text-sm text-muted-foreground">
-                {statusFilter === 'all'
+                {statusFilter === 'all' && !searchTerm
                     ? `Showing all ${filteredPeriods.length} periods`
-                    : <>Filtered by <span className="font-semibold text-foreground">{formatStatus(statusFilter)}</span> — {filteredPeriods.length} result{filteredPeriods.length !== 1 ? 's' : ''}</>
+                    : (statusFilter !== 'all' || searchTerm) && (
+                        <>Filtered by {statusFilter !== 'all' && <span className="font-semibold text-foreground">{formatStatus(statusFilter)}</span>}
+                        {searchTerm && <span className="font-semibold text-foreground"> "{searchTerm}"</span>} — {filteredPeriods.length} result{filteredPeriods.length !== 1 ? 's' : ''}</>
+                    )
                 }
             </p>
+            
             <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -427,34 +436,21 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                         ))}
                     </SelectContent>
                 </Select>
-                {statusFilter !== 'all' && (
+                {(statusFilter !== 'all' || searchTerm) && (
                     <button
-                        onClick={() => setStatusFilter('all')}
+                        onClick={() => {
+                            setStatusFilter('all');
+                            setSearchTerm('');
+                        }}
                         className="rounded-xl border-2 border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-accent hover:text-accent active:scale-95"
                     >
-                        Clear
+                        Clear All
                     </button>
                 )}
             </div>
         </div>
     );
-
-    // Custom empty state when filter returns no results
-    const filterEmptyState = (
-        <div className="flex flex-col items-center justify-center rounded-2xl py-16 text-center">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                <Filter className="h-6 w-6 text-primary/50" />
-            </div>
-            <p className="text-base font-semibold text-muted-foreground">No periods match this filter</p>
-            <button
-                onClick={() => setStatusFilter('all')}
-                className="mt-4 rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95"
-            >
-                Clear Filter
-            </button>
-        </div>
-    );
-
+    
     // Get color for stat card based on status
     const getStatusColor = (status: string): 'primary' | 'secondary' | 'accent' | 'muted' => {
         const config = getStatusConfig(status);
@@ -465,7 +461,6 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payroll Periods" />
 
-            {/* style animations */}
             <style>{`
                 @keyframes fadeUp {
                     from { opacity: 0; transform: translateY(16px); }
@@ -491,7 +486,6 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                         />
 
                         <div className="flex flex-row justify-between items-center gap-3 -mt-2 mb-3 lg:flex-col lg:items-end lg:justify-end lg:gap-2 lg:-mt-5">
-                            {/* Total count badge - left on mobile, bottom on desktop */}
                             <div className="flex items-center gap-2 lg:order-1 mt-2">
                                 <span className='border px-1.5 py-0.1 rounded-full text-sm bg-primary/10 border-primary/30'>
                                     {payrollPeriods.length}
@@ -500,14 +494,6 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                                     total <span className="text-blue-800 font-bold">{payrollPeriods.length === 1 ? 'period' : 'periods'}</span>
                                 </span>
                             </div>
-
-                            {/* Add button - right on mobile, top on desktop */}
-                            {/* <Link href={PayrollPeriodController.create().url} className="lg:order-2">
-                                <Button className="bg-[#1d4791] hover:bg-[#1d4791]/90 whitespace-nowrap">
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    <span>Add Payroll Period</span>
-                                </Button>
-                            </Link> */}
                         </div>
                     </div>
 
@@ -517,8 +503,11 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                             <StatCard
                                 label="All"
                                 count={counts.all}
-                                active={statusFilter === 'all'}
-                                onClick={() => setStatusFilter('all')}
+                                active={statusFilter === 'all' && !searchTerm}
+                                onClick={() => {
+                                    setStatusFilter('all');
+                                    setSearchTerm('');
+                                }}
                                 color="muted"
                             />
                             {payroll_period_enums?.map(({ value, label }) => (
@@ -526,48 +515,70 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                                     key={value}
                                     label={label}
                                     count={counts[value] || 0}
-                                    active={statusFilter === value}
-                                    onClick={() => setStatusFilter(value)}
+                                    active={statusFilter === value && !searchTerm}
+                                    onClick={() => {
+                                        setStatusFilter(value);
+                                        setSearchTerm('');
+                                    }}
                                     color={getStatusColor(value)}
                                 />
                             ))}
                         </div>
                     )}
-
-                    {/* ── Data table (or empty states) ── */}
-                    {payrollPeriods.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border py-24 text-center">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                                <CalendarDays className="h-8 w-8 text-primary/50" />
-                            </div>
-                            <p className="text-lg font-semibold text-muted-foreground">No payroll periods yet</p>
-                            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                                Get started by creating your first payroll period.
-                            </p>
-                            {/* <Link
-                                href={PayrollPeriodController.create().url}
-                                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:brightness-110 hover:shadow-lg active:scale-95"
-                            >
-                                <Plus className="h-4 w-4" />
-                                Create First Period
-                            </Link> */}
-                        </div>
-                    ) : (
-                        <div className="pp-row">
-                            <CustomTable
-                                title="Payroll Period Lists"
-                                columns={columns}
-                                actions={actions}
-                                data={filteredPeriods}
-                                from={1}
-                                onView={(period) => { setSelectedPeriod(period); setIsModalOpen(true); }}
-                                onEdit={(period) => router.visit(PayrollPeriodController.edit(period.id).url)}
-                                onRunPayroll={handleRunPayroll}
-                                toolbar={toolbar}
-                                filterEmptyState={filterEmptyState}
-                            />
-                        </div>
-                    )}
+                    
+                    <div className="pp-row">
+                        <CustomTable
+                            title="Payroll Period Lists"
+                            columns={columns}
+                            actions={actions}
+                            data={filteredPeriods}
+                            from={1}
+                            onView={(period) => { setSelectedPeriod(period); setIsModalOpen(true); }}
+                            onEdit={(period) => router.visit(PayrollPeriodController.edit(period.id).url)}
+                            onRunPayroll={handleRunPayroll}
+                            toolbar={toolbar}
+                            searchTerm={searchTerm}
+                            hasActiveFilters={statusFilter !== 'all' || !!searchTerm}
+                            filterEmptyState={
+                                <div className="flex flex-col items-center justify-center rounded-2xl py-16 text-center">
+                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                                        <Search className="h-6 w-6 text-primary/50" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                        No results found
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        {searchTerm && statusFilter !== 'all' 
+                                            ? `No payroll periods matching "${searchTerm}" with status "${formatStatus(statusFilter)}".`
+                                            : searchTerm 
+                                                ? `No payroll periods matching "${searchTerm}".`
+                                                : `No payroll periods with status "${formatStatus(statusFilter)}".`
+                                        }
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            setStatusFilter('all');
+                                            setSearchTerm('');
+                                        }}
+                                        className="mt-4 rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                    >
+                                        Clear Filters
+                                    </button>
+                                </div>
+                            }
+                            emptyState={
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <Calendar className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No payroll periods yet.</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        Please import your attendance to automatically create payroll periods.
+                                    </p>
+                                </div>
+                            }
+                        />
+                    </div>
 
                     {/* ── Detail modal view ── */}
                     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -586,7 +597,6 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
 
                             {selectedPeriod && (
                                 <div className="space-y-3 pt-2">
-                                    {/* Period range */}
                                     <div className="rounded-xl border border-border bg-card p-4">
                                         <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                             Period Range
@@ -603,13 +613,11 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                                         </div>
                                     </div>
 
-                                    {/* Pay date */}
                                     <div className="rounded-xl border border-border bg-card p-4">
                                         <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pay Date</p>
                                         <p className="text-sm font-semibold text-foreground">{formatDate(selectedPeriod.pay_date)}</p>
                                     </div>
 
-                                    {/* Status */}
                                     <div className="rounded-xl border border-border bg-card p-4">
                                         <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</p>
                                         <StatusBadge
@@ -620,13 +628,11 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                                         />
                                     </div>
 
-                                    {/* Payment Status */}
                                     <div className="rounded-xl border border-border bg-card p-4">
                                         <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Payment Status</p>
                                         <PaymentBadge isPaid={selectedPeriod.is_paid} />
                                     </div>
 
-                                    {/* Summary */}
                                     <div className="rounded-xl bg-primary/5 p-4">
                                         <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Summary</p>
                                         <p className="text-sm text-foreground">
@@ -644,7 +650,6 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                                         </p>
                                     </div>
 
-                                    {/* Modal actions */}
                                     <div className="flex gap-2 pt-1">
                                         <Link
                                             href={PayrollPeriodController.edit(selectedPeriod.id).url}

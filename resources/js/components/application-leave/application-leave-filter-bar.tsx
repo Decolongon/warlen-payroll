@@ -81,6 +81,7 @@ export function ApplicationLeaveFilterBar({
                         value={status === '' ? undefined : status}
                         onChange={(value) => onStatusChange(value || '')}
                         placeholder="All Statuses"
+                        className='cursor-pointer'
                     />
                 )}
             </div>
@@ -96,6 +97,7 @@ export function ApplicationLeaveFilterBar({
                         'hover:bg-[#d85e39]/8 dark:hover:bg-[#d85e39]/15',
                         'border border-transparent hover:border-[#d85e39]/20',
                         'transition-all duration-150',
+                        'cursor-pointer'
                     )}
                 >
                     <X className="h-3.5 w-3.5" />

@@ -1,6 +1,6 @@
 // pages/incentives/index.tsx
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Briefcase, Coins, Eye, Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Briefcase, Coins, Eye, Plus, X, Pencil, Trash2 } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CustomHeader } from '@/components/custom-header';
 import { CustomTable } from '@/components/custom-table';
@@ -397,9 +397,11 @@ export default function Index({ incentives, payroll_periods, employees, filters 
 						icon={<Coins className="h-6 w-6" />}
 						description="Manage employee incentives across payroll periods"
 					/>
-					<Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90">
-						<Plus className="h-4 w-4 mr-2" /> Add Incentive
-					</Button>
+					{incentives.total >= 1 && (
+						<Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90">
+							<Plus className="h-4 w-4 mr-2" /> Add Incentive
+						</Button>
+					)}
 				</div>
 
 				{/* Table Section */}
@@ -414,6 +416,8 @@ export default function Index({ incentives, payroll_periods, employees, filters 
 						onDelete={handleDeleteClick}
 						title="Incentive Lists"
 						isLoading={isLoading}
+						hasActiveFilters={hasFilters}
+						searchTerm = {searchTerm}
 						toolbar={
 							<EmployeeFilterBar
 								filters={{ search: true, position: false, branch: false, site: false, date: true, status: false }}
@@ -438,30 +442,31 @@ export default function Index({ incentives, payroll_periods, employees, filters 
 								onStatusChange={() => { }}
 							/>
 						}
+						filterEmptyState={
+							<div className="flex flex-col items-center justify-center py-16">
+								<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+									<X className="h-5 w-5 text-muted-foreground" />
+								</div>
+								<h3 className="text-sm font-semibold mb-2">No results found</h3>
+								<p className="text-xs text-muted-foreground mb-4">
+									No incentives match "{searchTerm}" {dateFrom || dateTo ? 'in the selected date range' : ''}
+								</p>
+								<Button variant="outline" className="cursor-pointer" onClick={clearFilters}>Clear all filters</Button>
+							</div>
+						}
 						emptyState={
-							incentives.total === 0 && !hasFilters ? (
-								<div className="flex flex-col items-center justify-center py-16">
-									<div className="rounded-full bg-primary/10 p-6 mb-4">
-										<Briefcase className="h-12 w-12 text-primary" />
-									</div>
-									<h3 className="text-xl font-semibold mb-2">No incentives yet</h3>
-									<p className="text-muted-foreground mb-4">Create your first incentive to get started</p>
-									<Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90">
-										Create First Incentive
-									</Button>
+							<div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+								<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+									<Coins className="h-5 w-5 text-slate-500 dark:text-slate-400" />
 								</div>
-							) : currentData.length === 0 && hasFilters ? (
-								<div className="flex flex-col items-center justify-center py-16">
-									<div className="rounded-full bg-muted p-6 mb-4">
-										<Search className="h-12 w-12 text-muted-foreground" />
-									</div>
-									<h3 className="text-xl font-semibold mb-2">No results found</h3>
-									<p className="text-muted-foreground mb-4">
-										No incentives match "{searchTerm}" {dateFrom || dateTo ? 'in the selected date range' : ''}
-									</p>
-									<Button variant="outline" onClick={clearFilters}>Clear all filters</Button>
-								</div>
-							) : null
+								<h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No incentives found</h3>
+								<p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+									Add incentive to start managing employee rewards and payroll bonuses.
+								</p>
+								<Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90 cursor-pointer">
+									<Plus />Add Incentive
+								</Button>
+							</div>
 						}
 					/>
 

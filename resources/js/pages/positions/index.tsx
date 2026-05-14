@@ -1,5 +1,5 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Briefcase, Search, BriefcaseBusiness } from 'lucide-react';
+import { Briefcase, X, BriefcaseBusiness } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { TableSearchHeader } from '@/components/table-search-header';
 import { Button } from '@/components/ui/button';
@@ -69,7 +69,7 @@ const toastStyle = (color: string) => ({
 export default function Index({ positions, filters = { search: '', perPage: '10' }, totalCount, filteredCount }: IndexProps) {
     const { delete: destroy } = useForm();
     const { props } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>();
-    
+
     const { data, setData } = useForm({
         search: filters?.search || '',
         perPage: filters?.perPage || '10',
@@ -182,7 +182,7 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
 
     const confirmDelete = () => {
         if (!positionToDelete) return;
-        
+
         setIsDeleting(true);
         destroy(PositionController.destroy(positionToDelete.pos_slug).url, {
             onSuccess: () => {
@@ -221,10 +221,10 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
             {/* <CustomToast /> */}
 
             <div className="flex flex-col gap-4 p-4 min-h-[calc(85vh-48px)] mx-4">
-                
+
                 {/* Header with title */}
                 <div className="flex justify-between items-center">
-                    <CustomHeader 
+                    <CustomHeader
                         title="Positions"
                         description="Manage job positions and their corresponding basic salaries."
                         icon={<BriefcaseBusiness />}
@@ -254,15 +254,16 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
                         </div>
                     ) : (
                         <>
-                            <CustomTable 
+                            <CustomTable
                                 title="Position Lists"
                                 columns={updatedColumns}
                                 actions={PositionTableConfig.actions}
                                 data={filteredPositions}
                                 from={positions.from ?? 1}
                                 onDelete={handleDeleteClick}
-                                onView={() => {}}
+                                onView={() => { }}
                                 onEdit={handleEditClick}
+                                hasActiveFilters={hasActiveFilters}
                                 toolbar={
                                     <TableSearchHeader
                                         searchValue={data.search}
@@ -272,35 +273,44 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
                                     />
                                 }
                                 emptyState={
-                                    hasNoFilterResults ? (
-                                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                                <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-                                            </div>
-                                            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                                No results found
-                                            </h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                No positions matching "{data.search}".
-                                            </p>
-                                            <Button variant="outline" size="sm" onClick={handleSearchReset}>
-                                                Clear search
-                                            </Button>
+                                    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                            <Briefcase className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                                         </div>
-                                    ) : undefined
+                                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No positions yet.</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                            Add your first position to get started.
+                                        </p>
+                                    </div>
+                                }
+                                filterEmptyState={
+                                    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                            <X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                            No results found
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                            No positions matching "{data.search}".
+                                        </p>
+                                        <Button variant="outline" size="sm" onClick={handleSearchReset}>
+                                            Clear filters
+                                        </Button>
+                                    </div>
                                 }
                             />
 
-                            <CustomPagination 
+                            <CustomPagination
                                 pagination={positions}
                                 perPage={data.perPage}
                                 onPerPageChange={handlePerPageChange}
                                 totalCount={totalCount}
                                 filteredCount={filteredCount}
                                 search={data.search}
-                                resourceName='positions'
+                                resourceName='position'
                             />
-                            
+
                             {/* Delete Confirmation Dialog */}
                             <DeleteConfirmationDialog
                                 isOpen={deleteDialogOpen}

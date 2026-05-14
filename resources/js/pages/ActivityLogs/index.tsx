@@ -110,34 +110,6 @@ const StatsCard = React.memo(({
     );
 });
 
-// Empty State Component
-const TableEmptyState = ({ hasFilters, searchTerm, onClearFilters }: { hasFilters: boolean; searchTerm: string; onClearFilters: () => void }) => {
-    const Icon = hasFilters ? Search : Database;
-
-    return (
-        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className={cn("rounded-full p-4 mb-4", hasFilters ? "bg-blue-50" : "bg-gray-50")}>
-                <Icon className={cn("h-12 w-12", hasFilters ? "text-blue-500" : "text-gray-400")} />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                {hasFilters ? "No matching activity logs found" : "No activity logs available"}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
-                {hasFilters && searchTerm
-                    ? `No activity logs matching "${searchTerm}". Try adjusting your search or filters.`
-                    : hasFilters
-                        ? "No activity logs match your current filters. Try adjusting your search criteria."
-                        : "There are no activity logs to display at the moment."}
-            </p>
-            {hasFilters && (
-                <Button variant="outline" className="mt-4" onClick={onClearFilters}>
-                    Clear all filters
-                </Button>
-            )}
-        </div>
-    );
-};
-
 export default function Index({
     activityLogs,
     filters = {},
@@ -250,10 +222,7 @@ export default function Index({
         applyFilters({ perPage: value });
     };
 
-    // Change this - from accepting URL to accepting page number
     const handlePageChange = useCallback((page: number) => {
-        console.log('Page change triggered with page:', page);
-
         const params: Record<string, string> = {
             page: page.toString(),
             perPage: perPage,
@@ -382,6 +351,7 @@ export default function Index({
                         filteredCount={filteredCount}
                         totalCount={totalCount}
                         searchTerm={searchTerm}
+                        hasActiveFilters={hasActiveFilters}
                         title="Activity Log Lists"
                         toolbar={
                             <ActivityLogsFilterBar
@@ -403,12 +373,30 @@ export default function Index({
                         onView={handleView}
                         onDelete={() => { }}
                         onEdit={() => { }}
+                        emptyState={
+                            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                                <div className="rounded-full bg-gray-100 dark:bg-gray-800 p-4 mb-4">
+                                    <Database className="h-12 w-12 text-gray-400 dark:text-gray-500" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                                    No activity logs available
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
+                                    There are no activity logs to display at the moment.
+                                </p>
+                            </div>
+                        }
                         filterEmptyState={
-                            <TableEmptyState
-                                hasFilters={hasActiveFilters}
-                                searchTerm={searchTerm}
-                                onClearFilters={clearFilters}
-                            />
+                            <div className="flex flex-col items-center justify-center py-16">
+                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                    <X className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <h3 className="text-sm font-semibold mb-2">No results found</h3>
+                                <p className="text-xs text-muted-foreground mb-4">
+                                    No activity logs matching "{searchTerm}" were found. Try adjusting your search or filters.
+                                </p>
+                                <Button variant="outline" onClick={clearFilters}>Clear all filters</Button>
+                            </div>
                         }
                     />
                 </div>
@@ -425,7 +413,7 @@ export default function Index({
                             }}
                             perPage={perPage}
                             onPerPageChange={handlePerPageChange}
-                            onPageChange={handlePageChange}  // Now it expects (page: number) => void
+                            onPageChange={handlePageChange}
                             totalCount={totalCount || pagination.total}
                             filteredCount={filteredCount || pagination.total}
                             search={searchTerm}
