@@ -12,9 +12,9 @@ trait EmployeeValidationRules
     protected function empRules(): array
     {
         return [
-            // ── Contact ──────────────────────────────────────────────────────
+
             'emergency_contact_number' => [
-                'required',
+                'nullable',
                 'string',
                 'min:11',
                 'regex:/^(\+63|0)?9\d{9}$/',
@@ -98,14 +98,14 @@ trait EmployeeValidationRules
             'mother_name' => [
                 'nullable',
                 'string',
-                'max:100',
+                'max:75',
                 'regex:/^[a-zA-Z\s\'\-]+$/',
             ],
 
             'father_name' => [
                 'nullable',
                 'string',
-                'max:100',
+                'max:75',
                 'regex:/^[a-zA-Z\s\'\-]+$/',
             ],
 
@@ -113,17 +113,7 @@ trait EmployeeValidationRules
                 'nullable',
                 'string',
                 'max:100',
-                Rule::in([
-                    'Elementary Graduate',
-                    'High School Graduate',
-                    'Senior High School Graduate',
-                    'Vocational',
-                    'Associate Degree',
-                    "Bachelor's Degree",
-                    "Master's Degree",
-                    'Doctorate',
-                    'No Formal Education',
-                ]),
+                'regex:/^[a-zA-Z\s\'\-]+$/',
             ],
 
             'certificate' => [
@@ -135,18 +125,15 @@ trait EmployeeValidationRules
             'permanent_address' => [
                 'nullable',
                 'string',
-                'max:500',
+                'max:255',
             ],
 
             'present_address' => [
                 'nullable',
                 'string',
-                'max:500',
+                'max:255',
             ],
 
-            // ── Skills ───────────────────────────────────────────────────────
-            // The form sends skills as a JSON string; prepareForValidation()
-            // in each Request class decodes it to an array before these rules run.
             'skills' => [
                 'nullable',
                 'array',
@@ -166,7 +153,7 @@ trait EmployeeValidationRules
             ],
 
             'contract_end_date' => [
-                'required',
+                'nullable',
                 'date',
                 'after_or_equal:contract_start_date',
             ],
@@ -179,7 +166,7 @@ trait EmployeeValidationRules
 
             // ── Government numbers ───────────────────────────────────────────
             'sss_number' => [
-                'required',
+                'nullable',
                 'string',
                 'max:15',
                 'regex:/^[\d\-]+$/',
@@ -187,7 +174,7 @@ trait EmployeeValidationRules
             ],
 
             'pagibig_number' => [
-                'required',
+                'nullable',
                 'string',
                 'max:15',
                 'regex:/^[\d\-]+$/',
@@ -195,11 +182,19 @@ trait EmployeeValidationRules
             ],
 
             'philhealth_number' => [
-                'required',
+                'nullable',
                 'string',
                 'max:15',
                 'regex:/^[\d\-]+$/',
                 new UniqueEncrypted(Employee::class, 'philhealth_number', $this->route('employee')?->id),
+            ],
+
+            'tin_number' => [
+                'nullable',
+                'string',
+                'max:15',
+                'regex:/^[\d\-]+$/',
+                new UniqueEncrypted(Employee::class, 'tin_number', $this->route('employee')?->id),
             ],
 
             // ── Employment ───────────────────────────────────────────────────

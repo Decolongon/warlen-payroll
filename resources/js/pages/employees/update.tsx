@@ -21,7 +21,6 @@ import { useEffect, useRef, useState } from 'react';
 import { update } from '@/actions/App/Http/Controllers/EmployeeController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
@@ -56,7 +55,6 @@ interface DropdownProps {
     showAllResults?: boolean;
 }
 
-// ---------- Helper functions ----------
 const formatDateForInput = (dateString: string | null | undefined) => {
     if (!dateString) return '';
     if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) return dateString;
@@ -79,7 +77,39 @@ const computeAge = (dob: string): string => {
     return age >= 0 ? String(age) : '';
 };
 
-// Status label mapping (manual selection)
+// NEW HELPER: Format date range into human-readable string
+function formatDateRange(startDateStr: string | null, endDateStr: string | null): string {
+    if (!startDateStr || !endDateStr) return 'Undefined';
+
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 'Invalid dates';
+    if (end < start) return 'End date before start date';
+
+    let years = end.getFullYear() - start.getFullYear();
+    let months = end.getMonth() - start.getMonth();
+    let days = end.getDate() - start.getDate();
+
+    // Adjust for negative days
+    if (days < 0) {
+        months--;
+        const lastMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+        days += lastMonth.getDate();
+    }
+    // Adjust for negative months
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+
+    const parts: string[] = [];
+    if (years > 0) parts.push(`${years} year${years !== 1 ? 's' : ''}`);
+    if (months > 0) parts.push(`${months} month${months !== 1 ? 's' : ''}`);
+    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+
+    return parts.length ? parts.join(', ') : '0 days';
+}
+
 const STATUS_LABEL: Record<string, string> = {
     active: 'Active',
     newly_hired: 'Newly Hired',
@@ -89,19 +119,6 @@ const STATUS_LABEL: Record<string, string> = {
     resigned: 'Resigned',
 };
 
-const EDUC_ATTAINMENT_OPTIONS = [
-    'Elementary Graduate',
-    'High School Graduate',
-    'Senior High School Graduate',
-    'Vocational',
-    'Associate Degree',
-    "Bachelor's Degree",
-    "Master's Degree",
-    'Doctorate',
-    'No Formal Education',
-];
-
-// ---------- Reusable Components ----------
 function SearchableDropdown({
     label,
     items,
@@ -126,24 +143,18 @@ function SearchableDropdown({
             </Label>
             <div className="relative">
                 <div
-                    className={`flex cursor-pointer items-center justify-between rounded-xl border-2 bg-background px-4 py-2.5 transition-all ${
-                        isOpen
-                            ? 'border-primary ring-2 ring-primary/20'
-                            : 'border-border hover:border-primary/50'
-                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                    className={`flex cursor-pointer items-center justify-between rounded-xl border-2 bg-background px-4 py-2.5 transition-all ${isOpen
+                        ? 'border-primary ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/50'
+                        } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                 >
-                    <span
-                        className={`text-sm ${
-                            !selectedItem ? 'text-muted-foreground' : 'text-foreground'
-                        }`}
-                    >
+                    <span className={`text-sm ${!selectedItem ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {selectedItem?.name || placeholder}
                     </span>
                     <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${
-                            isOpen ? 'rotate-180' : ''
-                        }`}
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''
+                            }`}
                     />
                 </div>
 
@@ -336,7 +347,6 @@ function FormSection({
     );
 }
 
-// ---------- Main Component ----------
 export default function Update({ positions, branches, employee, site = [] }: Props) {
     const [availableSites, setAvailableSites] = useState<any[]>([]);
     const [positionSearch, setPositionSearch] = useState('');
@@ -345,6 +355,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
     const [showSss, setShowSss] = useState(false);
     const [showPagibig, setShowPagibig] = useState(false);
     const [showPhilhealth, setShowPhilhealth] = useState(false);
+    const [showTin, setShowTin] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Employees', href: '/employees' },
@@ -367,34 +378,27 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
     };
 
     const { data, setData, put, processing, errors } = useForm({
-        // User account
         name: employee.user?.name || '',
         email: employee.user?.email || '',
         password: '',
-        // Identification
         emp_code: employee.emp_code || '',
         employee_number: employee.employee_number || '',
-        // Avatar
         avatar: employee.avatar || '',
         remove_avatar: undefined as string | undefined,
-        // Assignment
         position_id: employee.position_id?.toString() || '',
         branch_id: employee.branch_id?.toString() || '',
         site_id: employee.site_id?.toString() || '',
-        // Contract
         contract_start_date: formatDateForInput(employee.contract_start_date),
         contract_end_date: formatDateForInput(employee.contract_end_date),
         pay_frequency: employee.pay_frequency || '',
-        employee_status: employee.employee_status || 'newly_hired', // ✅ use DB value, no auto‑derivation
-        // Contact
+        employee_status: employee.employee_status || 'newly_hired',
         emergency_contact_number: employee.emergency_contact_number || '',
         contact_person: employee.contact_person || '',
         contact_person_number: employee.contact_person_number || '',
-        // Government numbers
         sss_number: employee.sss_number?.toString() || '',
         pagibig_number: employee.pagibig_number?.toString() || '',
         philhealth_number: employee.philhealth_number?.toString() || '',
-        // Personal info
+        tin_number: employee.tin_number?.toString() || '',
         gender: employee.gender || 'male',
         age: employee.age || '',
         dob: employee.dob ? formatDateForInput(employee.dob) : '',
@@ -407,15 +411,10 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         skills: parseSkills(employee.skills),
     });
 
-    // Auto‑compute age from DOB
     useEffect(() => {
         setData('age', computeAge(data.dob));
     }, [data.dob]);
 
-    // ❌ REMOVED: useEffect that automatically set employee_status from contract dates
-    // Status is now fully manual via dropdown.
-
-    // Initialize search values from selected items
     useEffect(() => {
         const selectedPos = positions?.find((p) => p.id === parseInt(data.position_id));
         if (selectedPos) setPositionSearch(selectedPos.pos_name);
@@ -423,7 +422,6 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         if (selectedBranch) setBranchSearch(selectedBranch.branch_name);
     }, []);
 
-    // Filter sites by branch
     useEffect(() => {
         if (data.branch_id) {
             const filtered = site.filter((s) => s.branch_id === parseInt(data.branch_id));
@@ -439,16 +437,14 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         }
     }, [data.branch_id]);
 
-    // Government number helper
     const handleGovNumberChange = (
-        field: 'sss_number' | 'pagibig_number' | 'philhealth_number',
+        field: 'sss_number' | 'pagibig_number' | 'philhealth_number' | 'tin_number',
         value: string,
         maxLength: number
     ) => {
         setData(field, value.replace(/[^0-9\-]/g, '').slice(0, maxLength));
     };
 
-    // Avatar handling
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(
         employee.avatar ? `/storage/${employee.avatar}` : null
@@ -475,7 +471,6 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         put(update(employee.slug_emp).url);
     };
 
-    // Prepare dropdown items
     const positionItems = positions.map((p) => ({ id: p.id, name: p.pos_name }));
     const branchItems = branches.map((b) => ({ id: b.id, name: b.branch_name }));
     const siteItems = availableSites.map((s) => ({ id: s.id, name: s.site_name || s.name || '' }));
@@ -489,6 +484,9 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
     const filteredSites = siteItems
         .filter((s) => s.name.toLowerCase().includes(siteSearch.toLowerCase()))
         .slice(0, 5);
+
+    // Compute formatted duration on every render
+    const contractDuration = formatDateRange(data.contract_start_date, data.contract_end_date);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -684,18 +682,13 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
 
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Educational Attainment</Label>
-                                    <select
+                                    <Input
                                         value={data.educ_attainment}
                                         onChange={(e) => setData('educ_attainment', e.target.value)}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
-                                    >
-                                        <option value="">Select educational attainment</option>
-                                        {EDUC_ATTAINMENT_OPTIONS.map((opt) => (
-                                            <option key={opt} value={opt}>
-                                                {opt}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        placeholder="e.g., High School Graduate"
+                                        className="rounded-xl"
+                                        maxLength={100}
+                                    />
                                     <InputError message={errors.educ_attainment} />
                                 </div>
 
@@ -778,17 +771,6 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                         {/* 5. Employee Details */}
                         <FormSection icon={Briefcase} title="Employee Details" index={5}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">
-                                        Contact Number <span className="text-destructive">*</span>
-                                    </Label>
-                                    <PhoneInput
-                                        value={data.employee_number}
-                                        onChange={(val) => setData('employee_number', val)}
-                                        error={errors.employee_number}
-                                    />
-                                </div>
-
                                 <SearchableDropdown
                                     label="Position"
                                     items={filteredPositions}
@@ -822,7 +804,6 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <InputError message={errors.pay_frequency} />
                                 </div>
 
-                                {/* Status – fully manual control */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Status</Label>
                                     <select
@@ -837,6 +818,17 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                         ))}
                                     </select>
                                     <InputError message={errors.employee_status} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">
+                                        Contact Number <span className="text-destructive">*</span>
+                                    </Label>
+                                    <PhoneInput
+                                        value={data.employee_number}
+                                        onChange={(val) => setData('employee_number', val)}
+                                        error={errors.employee_number}
+                                    />
                                 </div>
 
                                 <div className="space-y-2">
@@ -862,7 +854,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <InputError message={errors.contact_person} />
                                 </div>
 
-                                <div className="space-y-2 sm:col-span-2">
+                                <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Contact Person Number</Label>
                                     <PhoneInput
                                         value={data.contact_person_number}
@@ -878,7 +870,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        SSS Number <span className="text-destructive">*</span>
+                                        SSS Number
                                     </Label>
                                     <div className="relative">
                                         <Input
@@ -902,7 +894,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
 
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Pag-IBIG Membership ID <span className="text-destructive">*</span>
+                                        Pag-IBIG Membership ID
                                     </Label>
                                     <div className="relative">
                                         <Input
@@ -926,7 +918,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
 
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        PhilHealth Identification Number (PIN) <span className="text-destructive">*</span>
+                                        PhilHealth Identification Number (PIN)
                                     </Label>
                                     <div className="relative">
                                         <Input
@@ -947,77 +939,112 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     </div>
                                     <InputError message={errors.philhealth_number} />
                                 </div>
-                            </div>
-                        </FormSection>
 
-                        {/* 7. Contract Period */}
-                        <FormSection icon={Calendar} title="Contract Period" index={7}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Start Date <span className="text-destructive">*</span>
+                                        TIN Number
                                     </Label>
-                                    <DatePicker
-                                        value={data.contract_start_date}
-                                        onChange={(date) => setData('contract_start_date', date)}
-                                        placeholder="Select contract start date"
-                                    />
-                                    <InputError message={errors.contract_start_date} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">
-                                        End Date <span className="text-destructive">*</span>
-                                    </Label>
-                                    <DatePicker
-                                        value={data.contract_end_date}
-                                        onChange={(date) => setData('contract_end_date', date)}
-                                        placeholder="Select contract end date"
-                                        minDate={data.contract_start_date ? new Date(data.contract_start_date) : undefined}
-                                    />
-                                    <InputError message={errors.contract_end_date} />
+                                    <div className="relative">
+                                        <Input
+                                            type={showTin ? 'text' : 'password'}
+                                            value={data.tin_number}
+                                            onChange={(e) => handleGovNumberChange('tin_number', e.target.value, 15)}
+                                            placeholder="e.g., 123-456-789-000"
+                                            maxLength={15}
+                                            className="rounded-xl pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTin(!showTin)}
+                                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                                        >
+                                            {showTin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                    <InputError message={errors.tin_number} />
                                 </div>
                             </div>
                         </FormSection>
 
-                        {/* 8. Location Assignment */}
-                        <FormSection icon={MapPin} title="Location Assignment" index={8}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <SearchableDropdown
-                                    label="Branch"
-                                    items={filteredBranches}
-                                    selectedId={data.branch_id}
-                                    onSelect={(id, name) => {
-                                        setData('branch_id', id);
-                                        setBranchSearch(name);
-                                    }}
-                                    searchValue={branchSearch}
-                                    onSearchChange={setBranchSearch}
-                                    required
-                                    error={errors.branch_id}
-                                    placeholder="Select a branch"
-                                    searchPlaceholder="Search branches..."
-                                />
-
-                                {data.branch_id && (
+                        <FormSection icon={MapPin} title="Assignment & Contract Period" index={7}>
+                            <div className="space-y-6">
+                                {/* Location row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <SearchableDropdown
-                                        label="Site"
-                                        items={filteredSites}
-                                        selectedId={data.site_id}
+                                        label="Branch"
+                                        items={filteredBranches}
+                                        selectedId={data.branch_id}
                                         onSelect={(id, name) => {
-                                            setData('site_id', id);
-                                            setSiteSearch(name);
+                                            setData('branch_id', id);
+                                            setBranchSearch(name);
                                         }}
-                                        searchValue={siteSearch}
-                                        onSearchChange={setSiteSearch}
+                                        searchValue={branchSearch}
+                                        onSearchChange={setBranchSearch}
                                         required
-                                        error={errors.site_id}
-                                        placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
-                                        searchPlaceholder="Search sites..."
-                                        disabled={availableSites.length === 0}
+                                        error={errors.branch_id}
+                                        placeholder="Select a branch"
+                                        searchPlaceholder="Search branches..."
                                     />
-                                )}
+
+                                    {data.branch_id && (
+                                        <SearchableDropdown
+                                            label="Site"
+                                            items={filteredSites}
+                                            selectedId={data.site_id}
+                                            onSelect={(id, name) => {
+                                                setData('site_id', id);
+                                                setSiteSearch(name);
+                                            }}
+                                            searchValue={siteSearch}
+                                            onSearchChange={setSiteSearch}
+                                            required
+                                            error={errors.site_id}
+                                            placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
+                                            searchPlaceholder="Search sites..."
+                                            disabled={availableSites.length === 0}
+                                        />
+                                    )}
+                                </div>
+
+                                {/* Contract period row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold">
+                                            Start Date <span className="text-destructive">*</span>
+                                        </Label>
+                                        <input
+                                            type="date"
+                                            value={data.contract_start_date}
+                                            onChange={(e) => setData('contract_start_date', e.target.value)}
+                                            className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                        />
+                                        <InputError message={errors.contract_start_date} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold">
+                                            End Date <span className="text-destructive">*</span>
+                                        </Label>
+                                        <input
+                                            type="date"
+                                            value={data.contract_end_date}
+                                            onChange={(e) => setData('contract_end_date', e.target.value)}
+                                            min={data.contract_start_date || undefined}
+                                            className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                        />
+                                        <InputError message={errors.contract_end_date} />
+                                    </div>
+                                    {/* Duration display - HUMAN READABLE */}
+                                    <div className="sm:col-span-2">
+                                        <Label className="text-sm font-semibold">Contract Duration</Label>
+                                        <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
+                                            {contractDuration}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">Auto‑calculated from contract dates</p>
+                                    </div>
+                                </div>
                             </div>
                         </FormSection>
+
 
                         {/* Submit */}
                         <div className="flex justify-end pt-4">

@@ -4,10 +4,9 @@ export const EmployeesTableConfig = {
       label: 'Profile',
       key: 'avatar',
       className: 'p-4 align-items-center',
-      // Use a custom render instead of isImage to control the URL
+      toggleable: false,
       render: (row: any) => {
         if (!row.avatar) {
-          // Fallback placeholder
           return (
             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -16,9 +15,8 @@ export const EmployeesTableConfig = {
             </div>
           );
         }
-        // If avatar is already a full URL, use it; otherwise prepend storage path
-        const avatarUrl = row.avatar.startsWith('http') 
-          ? row.avatar 
+        const avatarUrl = row.avatar.startsWith('http')
+          ? row.avatar
           : `/storage/${row.avatar}`;
         return (
           <img
@@ -30,20 +28,25 @@ export const EmployeesTableConfig = {
       }
     },
     {
-      label: 'Code',
+      label: 'ID',
       key: 'emp_code',
-      className: ' px-4 py-3 tracking-wider'
+      className: 'px-4 py-3 tracking-wider',
+      toggleable: true,
+      defaultVisible: false,
     },
     {
       label: 'Name',
-      key: 'user.name',  // if your table supports dot notation; otherwise use render
-      className: ' p-4',
-      render: (row: any) => row.user?.name || 'N/A'  // fallback if dot notation not supported
+      key: 'user.name',
+      className: 'p-4',
+      toggleable: false,
+      render: (row: any) => row.user?.name || 'N/A'
     },
     {
       label: 'Position',
       key: 'position.pos_name',
-      className: ' p-4',
+      className: 'p-4',
+      toggleable: true,
+      defaultVisible: true,
       render: (row: any) => row.position?.pos_name && !row.position.deleted_at
         ? row.position.pos_name
         : <span className="text-gray-500 italic">Not assigned</span>
@@ -51,42 +54,66 @@ export const EmployeesTableConfig = {
     {
       label: 'Pay Frequency',
       key: 'pay_frequency',
-      className: ' p-4 capitalize',
+      className: 'p-4 capitalize',
+      toggleable: true,
+      defaultVisible: false,
       render: (row: any) => row.pay_frequency?.replace('_', ' ') || 'N/A'
     },
     {
       label: 'Branch',
       key: 'branch.branch_name',
-      className: ' p-4',
+      className: 'p-4',
+      toggleable: true,
+      defaultVisible: true,
       render: (row: any) => row.branch?.branch_name || 'N/A'
     },
     {
       label: 'Site',
       key: 'site.site_name',
-      className: ' p-4',
+      className: 'p-4',
+      toggleable: true,
+      defaultVisible: true,
       render: (row: any) => row.site?.site_name || 'N/A'
     },
     {
       label: 'Contract Period',
       key: 'contract_period',
-      className: ' p-4',
+      className: 'p-4',
+      toggleable: true,
+      defaultVisible: false,
       render: (row: any) => {
-        if (row.contract_start_date && row.contract_end_date) {
-          return `${formatDate(row.contract_start_date)} - ${formatDate(row.contract_end_date)}`;
-        }
-        return 'No contract period';
+        if (!row.contract_start_date) return 'No contract period';
+        const start = formatDate(row.contract_start_date);
+        const end = row.contract_end_date ? formatDate(row.contract_end_date) : 'Ongoing';
+        return `${start} – ${end}`;
       }
     },
     {
       label: 'Status',
       key: 'employee_status',
-      className: ' p-4',
+      className: 'p-4',
+      toggleable: true,
+      defaultVisible: true,
       render: (row: any) => {
-        const isActive = ['active', 'Active', 'ACTIVE'].includes(row.employee_status);
+        const status = row.employee_status?.toLowerCase() || '';
+
+        const statusConfig: Record<string, { label: string; className: string }> = {
+          active:            { label: 'Active',           className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 ring-1 ring-green-600/20' },
+          'newly_hired':     { label: 'Newly Hired',      className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 ring-1 ring-green-600/20' },
+          terminated:        { label: 'Terminated',       className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 ring-1 ring-red-600/20' },
+          resigned:          { label: 'Resigned',         className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 ring-1 ring-yellow-600/20' },
+          awol:              { label: 'AWOL',             className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 ring-1 ring-orange-600/20' },
+          'end_of_contract': { label: 'End of Contract',  className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 ring-1 ring-orange-600/20' },
+        };
+
+        const config = statusConfig[status] ?? {
+          label: row.employee_status || 'Unknown',
+          className: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 ring-1 ring-slate-500/20',
+        };
+
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-            }`}>
-            {row.employee_status || 'Unknown'}
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
+            {config.label}
           </span>
         );
       }
@@ -95,6 +122,7 @@ export const EmployeesTableConfig = {
       label: '',
       key: 'actions',
       isAction: true,
+      toggleable: false,
       className: 'p-4 text-center'
     },
   ],
@@ -102,7 +130,7 @@ export const EmployeesTableConfig = {
     {
       label: 'View',
       icon: 'Eye',
-      onClick: 'onView', // will call the onView prop with the row
+      onClick: 'onView',
       className: 'bg-transparent hover:bg-transparent text-gray-600 hover:text-gray-900 cursor-pointer'
     },
     {
@@ -120,7 +148,6 @@ export const EmployeesTableConfig = {
   ],
 };
 
-// Helper function (you can import from a shared utils file)
 function formatDate(dateString: string | undefined | null): string {
   if (!dateString) return '';
   try {

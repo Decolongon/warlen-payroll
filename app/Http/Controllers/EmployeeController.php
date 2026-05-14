@@ -32,26 +32,35 @@ class EmployeeController extends Controller
     public function index(Request $request)
     {
         Gate::authorize('viewAny', Employee::class);
-
+    
         $employees = $this->cacheRemember('employees', fn() => $this->employeeRepository->getEmployees());
-        $archived = $this->employeeRepository->getDeletedEmployees();
-
+        $archived  = $this->employeeRepository->getDeletedEmployees();
+    
         $allPositions = $employees->pluck('position.pos_name')->filter()->unique()->sort()->values()->all();
-
+    
+        // ── Apply status filter on the collection BEFORE paginating ─────────────
+        // Supports any of: active | end_of_contract | awol | terminated | resigned | newly_hired
+        $filteredEmployees = collect($employees);
+    
+        if ($request->filled('status')) {
+            $filteredEmployees = $filteredEmployees->filter(
+                fn($emp) => $emp->employee_status === $request->status
+            );
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+    
         $result = $this->paginateCollection(
-            items: collect($employees),
+            items: $filteredEmployees,
             request: $request,
             searchColumns: ['emp_code', 'user.name', 'position.pos_name', 'branch.branch_name', 'site.site_name', 'employee_status'],
         );
-
-        // Only branches that have active employees (with their sites)
-        $activeBranchesData = Branch::whereIn('id', $employees->pluck('branch.id'))->with('sites')->get();
-        // Only branches that have archived employees
-        $archivedBranchesData = Branch::whereIn('id', $archived->pluck('branch.id'))->with('sites')->get();
-
+    
+        $activeBranchesData   = Branch::whereIn('id', $employees->pluck('branch.id')->filter())->with('sites')->get();
+        $archivedBranchesData = Branch::whereIn('id', $archived->pluck('branch.id')->filter())->with('sites')->get();
+    
         return Inertia::render('employees/index', [
-            'archivedEmployees' => $archived,
-            'employees' => [
+            'archivedEmployees'    => $archived,
+            'employees'            => [
                 'data'    => $result['data'],
                 'links'   => $result['pagination']['links'] ?? [],
                 'from'    => $result['pagination']['from']  ?? 0,
@@ -62,11 +71,11 @@ class EmployeeController extends Controller
             'activeBranchesData'   => $activeBranchesData,
             'archivedBranchesData' => $archivedBranchesData,
             'allPositions'         => $allPositions,
-            'filters'              => $result['filters'],
+            'filters'              => $result['filters'],   // paginateCollection already includes 'status'
             'totalCount'           => $result['totalCount'],
             'filteredCount'        => $result['filteredCount'],
             'positionsList'        => Position::select('id', 'pos_name')->get(),
-            'allBranchesForAssign' => Branch::select('id', 'branch_name')->get(), // keep all for bulk assign
+            'allBranchesForAssign' => Branch::select('id', 'branch_name')->get(),
         ]);
     }
     /**

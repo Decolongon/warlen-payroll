@@ -42,24 +42,26 @@ const getAvatarUrl = (avatar: string | null | undefined): string | null => {
 };
 
 export const getPayrollTableColumns = (formatCurrency: (amount: number) => string) => [
+    // ── Always-visible columns (toggleable: false) ──────────────────────
     {
-        label: 'PROFILE',
+        label: 'Profile',
         key: 'employee_avatar',
+        toggleable: false,
         render: (row: PayrollTableRow) => {
             const avatarUrl = getAvatarUrl(row.employee_avatar);
             return avatarUrl ? (
                 <img
                     src={avatarUrl}
                     alt={row.employee_name}
-                    className="w-10 h-10 rounded-full object-cover flex justify-center items-center"
+                    className="w-10 h-10 rounded-full object-cover"
                     onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        const parent = (e.target as HTMLImageElement).parentElement;
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
                         if (parent) {
                             const fallback = document.createElement('div');
                             fallback.className = 'w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center';
                             fallback.innerHTML = `<span class="text-xs font-medium text-blue-600">${row.employee_name?.charAt(0).toUpperCase() || '?'}</span>`;
-                            (e.target as HTMLImageElement).style.display = 'none';
                             parent.appendChild(fallback);
                         }
                     }}
@@ -73,61 +75,112 @@ export const getPayrollTableColumns = (formatCurrency: (amount: number) => strin
             );
         },
     },
+
     {
-        label: 'EMPLOYEE NAME',
+        label: 'ID',
+        key: 'emp_code',
+        toggleable: true,
+        defaultVisible: false,
+        render: (row: PayrollTableRow) => (
+            <span className="text-xs text-gray-500 font-mono">{row.emp_code}</span>
+        ),
+    },
+    {
+        label: 'Name',
         key: 'employee_name',
+        toggleable: false,
+        render: (row: PayrollTableRow) => (
+            <span className="font-medium text-sm">{row.employee_name}</span>
+        ),
+    },
+
+    {
+        label: 'Branch',
+        key: 'branch_name',
+        toggleable: true,
+        defaultVisible: true,
+        render: (row: PayrollTableRow) => (
+            <span className="text-sm">{row.branch_name || 'N/A'}</span>
+        ),
+    },
+    {
+        label: 'Site',
+        key: 'site_name',
+        toggleable: true,
+        defaultVisible: true,
+        render: (row: PayrollTableRow) => (
+            <span className="text-sm">{row.site_name || 'N/A'}</span>
+        ),
+    },
+    {
+        label: 'Position',
+        key: 'position_name',
+        toggleable: true,
+        defaultVisible: false,
+        render: (row: PayrollTableRow) => (
+            <span className="text-sm">{row.position_name || 'N/A'}</span>
+        ),
+    },
+    {
+        label: 'Frequency',
+        key: 'pay_frequency',
+        toggleable: true,
+        defaultVisible: false,
+        render: (row: PayrollTableRow) => (
+            <span className="text-sm capitalize">{row.pay_frequency?.replace('_', ' ') || 'N/A'}</span>
+        ),
+    },
+    {
+        label: 'Period',
+        key: 'period_name',
+        toggleable: true,
+        defaultVisible: false,
         render: (row: PayrollTableRow) => (
             <div className="flex flex-col">
-                <span className="font-medium text-sm">{row.employee_name}</span>
-                <span className="text-xs text-gray-500">{row.emp_code}</span>
+                <span className="text-sm font-medium">{row.period_name || 'N/A'}</span>
+                {row.period_start && row.period_end && (
+                    <span className="text-xs text-gray-500">
+                        {formatDateToShortMonth(row.period_start)} – {formatDateToShortMonth(row.period_end)}
+                    </span>
+                )}
             </div>
         ),
     },
     {
-        label: 'BRANCH',
-        key: 'branch_name',
-        render: (row: PayrollTableRow) => <span className="text-sm">{row.branch_name || 'N/A'}</span>,
-    },
-    {
-        label: 'SITE',
-        key: 'site_name',
-        render: (row: PayrollTableRow) => <span className="text-sm">{row.site_name || 'N/A'}</span>,
-    },
-    {
-        label: 'POSITION',
-        key: 'position_name',
-        render: (row: PayrollTableRow) => <span className="text-sm">{row.position_name}</span>,
-    },
-    {
-        label: 'FREQUENCY',
-        key: 'pay_frequency',
-        render: (row: PayrollTableRow) => <span>{row.pay_frequency}</span>,
-    },
-    {
-        label: 'GROSS PAY',
+        label: 'Gross Pay',
         key: 'gross_pay',
+        toggleable: true,
+        defaultVisible: true,
         render: (row: PayrollTableRow) => (
             <span className="font-medium text-green-600">{formatCurrency(row.gross_pay)}</span>
         ),
     },
     {
-        label: 'DEDUCTIONS',
+        label: 'Deductions',
         key: 'total_deduction',
+        toggleable: true,
+        defaultVisible: true,
         render: (row: PayrollTableRow) => (
             <span className="text-red-600">{formatCurrency(row.total_deduction)}</span>
         ),
     },
     {
-        label: 'NET PAY',
+        label: 'Net Pay',
         key: 'net_pay',
+        toggleable: true,
+        defaultVisible: true,
         render: (row: PayrollTableRow) => (
             <span className="font-bold text-blue-600">{formatCurrency(row.net_pay)}</span>
         ),
     },
+
+    // ── Actions (never toggleable) ───────────────────────────────────────
     {
-        label: 'ACTIONS',
+        label: '',
         key: 'actions',
         isAction: true,
+        toggleable: false,
+        className: 'p-4 text-center',
     },
 ];
 
@@ -135,30 +188,31 @@ export const getPayrollTableActions = (
     handleViewPayroll: (row: PayrollTableRow) => void,
     handleEmailPayroll: (row: PayrollTableRow) => void
 ) => [
-    {
-        label: 'View',
-        icon: 'Eye',
-        onClick: (row: PayrollTableRow) => handleViewPayroll(row),
-    },
-    {
-        label: 'Email',
-        icon: 'Mail',
-        onClick: (row: PayrollTableRow) => handleEmailPayroll(row),
-    },
-];
+        {
+            label: 'View',
+            icon: 'Eye',
+            onClick: (row: PayrollTableRow) => handleViewPayroll(row),
+        },
+        {
+            label: 'Sent Email',
+            icon: 'Mail',
+            onClick: (row: PayrollTableRow) => handleEmailPayroll(row),
+        },
+    ];
 
 export const getSkeletonColumns = () =>
     [
-        'EMPLOYEE',
-        'BRANCH',
-        'SITE',
-        'PERIOD',
-        'POSITION',
-        'FREQUENCY',
-        'GROSS PAY',
-        'DEDUCTIONS',
-        'NET PAY',
-        'ACTIONS',
+        'ID',
+        'Employee',
+        'Branch',
+        'Site',
+        'Position',
+        'Frequency',
+        'Period',
+        'Gross Pay',
+        'Deductions',
+        'Net Pay',
+        'Actions',
     ].map((label) => ({
         label,
         key: label.toLowerCase().replace(/\s+/g, '_'),

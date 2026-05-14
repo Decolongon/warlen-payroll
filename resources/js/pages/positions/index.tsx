@@ -3,10 +3,8 @@ import { Briefcase, X, BriefcaseBusiness } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { TableSearchHeader } from '@/components/table-search-header';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import { CustomToast } from '@/components/custom-toast';
 import { CustomHeader } from '@/components/custom-header';
 import { CustomTable } from '@/components/custom-table';
 import { CustomPagination } from '@/components/custom-pagination';
@@ -16,10 +14,7 @@ import { toast } from 'sonner';
 import { DeleteConfirmationDialog } from '@/components/delete-confirmation-modal';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Positions',
-        href: '/positions',
-    },
+    { title: 'Positions', href: '/positions' },
 ];
 
 interface Position {
@@ -30,7 +25,7 @@ interface Position {
     is_salary_fixed: boolean;
 }
 
-interface LinkProps {
+interface LinkItem {
     active: boolean;
     label: string;
     url: string | null;
@@ -38,10 +33,11 @@ interface LinkProps {
 
 interface PositionPagination {
     data: Position[];
-    links: LinkProps[];
+    links: LinkItem[];
     from: number;
     to: number;
     total: number;
+    current_page?: number;
 }
 
 interface FilterProps {
@@ -56,124 +52,119 @@ interface IndexProps {
     filteredCount: number;
 }
 
-// Custom toast style helper for sonner
 const toastStyle = (color: string) => ({
     style: {
         backgroundColor: 'white',
-        color: color,
+        color,
         border: '1px solid #e2e8f0',
         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
     },
 });
 
-export default function Index({ positions, filters = { search: '', perPage: '10' }, totalCount, filteredCount }: IndexProps) {
+export default function Index({
+    positions,
+    filters = { search: '', perPage: '10' },
+    totalCount,
+    filteredCount,
+}: IndexProps) {
     const { delete: destroy } = useForm();
     const { props } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>();
 
     const { data, setData } = useForm({
-        search: filters?.search || '',
+        search:  filters?.search  || '',
         perPage: filters?.perPage || '10',
     });
 
-    // Track last shown flash to prevent duplicates within a short time window
+    // Prevent duplicate toasts within a 500ms window
     const lastFlashRef = useRef<{ key: string; time: number }>({ key: '', time: 0 });
 
-    // Flash message listener – prevents duplicate toasts within 500ms
     useEffect(() => {
         const flash = props.flash;
         if (!flash) return;
 
         const flashKey = JSON.stringify(flash);
-        const now = Date.now();
-        const last = lastFlashRef.current;
+        const now      = Date.now();
+        const last     = lastFlashRef.current;
 
-        // If same flash key appeared within last 500ms, skip (prevents double toast)
-        if (last.key === flashKey && (now - last.time) < 500) {
-            return;
-        }
-
-        // Update ref
+        if (last.key === flashKey && now - last.time < 500) return;
         lastFlashRef.current = { key: flashKey, time: now };
 
-        if (flash.success) {
-            toast.success(flash.success, toastStyle('#16a34a')); // green text
-        }
-        if (flash.error) {
-            toast.error(flash.error, toastStyle('#dc2626')); // red text
-        }
-        if (flash.warning) {
-            toast.warning(flash.warning, toastStyle('#f97316')); // orange text
-        }
-        if (flash.info) {
-            toast.info(flash.info, toastStyle('#3b82f6')); // blue text
-        }
+        if (flash.success) toast.success(flash.success, toastStyle('#16a34a'));
+        if (flash.error)   toast.error(flash.error,     toastStyle('#dc2626'));
+        if (flash.warning) toast.warning(flash.warning, toastStyle('#f97316'));
+        if (flash.info)    toast.info(flash.info,       toastStyle('#3b82f6'));
     }, [props.flash]);
 
-    // Transform positions to convert boolean to Yes/No
-    const transformedPositions = useMemo(() => {
-        return positions.data.map(position => ({
-            ...position,
-            is_salary_fixed_display: position.is_salary_fixed ? 'Fixed' : 'Not Fixed'
-        }));
-    }, [positions.data]);
+    // Only transform display values — do NOT add a search filter here.
+    // The server already returns the correct page of results. Filtering
+    // the already-paginated slice client-side makes pagination do nothing.
+    const transformedPositions = useMemo(() =>
+        positions.data.map(p => ({
+            ...p,
+            is_salary_fixed_display: p.is_salary_fixed ? 'Fixed' : 'Not Fixed',
+        })),
+        [positions.data],
+    );
 
-    const filteredPositions = useMemo(() => {
-        if (!data.search) {
-            return transformedPositions;
-        }
+    // ── Shared navigation helper ──────────────────────────────────────────────
+    // Always sends ALL active params (search + perPage + page) so none are
+    // dropped when only one value changes.
+    const navigate = (overrides: Record<string, string>) => {
+        const params: Record<string, string> = {};
+        if (data.search)  params.search  = data.search;
+        if (data.perPage) params.perPage = data.perPage;
 
-        const term = data.search.toLowerCase().trim();
-        return transformedPositions.filter(position =>
-            position.pos_name.toLowerCase().includes(term)
+        // Merge overrides — caller can clear a key by passing ''
+        Object.assign(params, overrides);
+
+        // Strip empty strings so they don't pollute the URL
+        const clean = Object.fromEntries(
+            Object.entries(params).filter(([, v]) => v !== ''),
         );
-    }, [transformedPositions, data.search]);
 
-    const handleSearchChange = (value: string) => {
-        setData('search', value);
-
-        const queryString = {
-            ...(value && { search: value }),
-            ...(data.perPage && { perPage: data.perPage }),
-        };
-
-        router.get('/positions', queryString, {
-            preserveState: true,
+        router.get('/positions', clean, {
+            preserveState:  true,
             preserveScroll: true,
         });
     };
 
-    const handleSearchReset = () => {
+    // ── Handlers ──────────────────────────────────────────────────────────────
+
+    const handleSearchChange = (value: string) => {
+        setData('search', value);
+        navigate({ search: value, page: '' }); // reset to page 1 on new search
+    };
+
+
+ const handleSearchReset = () => {
         setData('search', '');
         setData('perPage', '10');
 
         router.get('/positions', {}, {
-            preserveState: true,
+            // preserveState: true,
             preserveScroll: true,
         });
     };
 
     const handlePerPageChange = (value: string) => {
         setData('perPage', value);
+        navigate({ perPage: value, page: '' }); // reset to page 1 on perPage change
+    };
 
-        const queryString = {
-            ...(data.search && { search: data.search }),
-            ...(value && { perPage: value }),
-        };
-
-        router.get(PositionController.index.url(), queryString, {
-            preserveState: true,
-            preserveScroll: true,
-        });
+    // CustomPagination calls onPageChange(pageNumber: number)
+    const handlePageChange = (page: number) => {
+        navigate({ page: String(page) });
     };
 
     const handleEditClick = (position: Position) => {
         router.get(PositionController.edit(position.pos_slug).url);
-    }
+    };
 
-    // Delete confirmation dialog state
+    // ── Delete dialog ─────────────────────────────────────────────────────────
+
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [positionToDelete, setPositionToDelete] = useState<Position | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+    const [isDeleting, setIsDeleting]             = useState(false);
 
     const handleDeleteClick = (position: Position) => {
         setPositionToDelete(position);
@@ -182,43 +173,40 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
 
     const confirmDelete = () => {
         if (!positionToDelete) return;
-
         setIsDeleting(true);
+
         destroy(PositionController.destroy(positionToDelete.pos_slug).url, {
             onSuccess: () => {
-                // Flash message will be shown by global useEffect
                 setDeleteDialogOpen(false);
                 setPositionToDelete(null);
             },
             onError: (errors) => {
-                const errorMessage = Object.values(errors).flat()[0] || 'Failed to delete position.';
-                toast.error(errorMessage, toastStyle('#dc2626'));
+                const msg = (Object.values(errors).flat()[0] as string) || 'Failed to delete position.';
+                toast.error(msg, toastStyle('#dc2626'));
             },
-            onFinish: () => {
-                setIsDeleting(false);
-            }
+            onFinish: () => setIsDeleting(false),
         });
     };
 
-    const hasActiveFilters = !!data.search.trim();
-    const hasNoPositions = positions.data.length === 0;
-    const hasNoFilterResults = hasActiveFilters && filteredPositions.length === 0;
+    // ── Derived flags ─────────────────────────────────────────────────────────
 
-    // Update the columns configuration to use the display value
-    const updatedColumns = PositionTableConfig.columns.map(col => {
-        if (col.key === 'is_salary_fixed') {
-            return {
-                ...col,
-                render: (row: any) => <span>{row.is_salary_fixed_display}</span>
-            };
-        }
-        return col;
-    });
+    const hasActiveFilters   = !!data.search.trim();
+    const hasNoPositions     = positions.data.length === 0 && !hasActiveFilters;
+    const hasNoFilterResults = hasActiveFilters && positions.data.length === 0;
+
+    // ── Column config ─────────────────────────────────────────────────────────
+
+    const updatedColumns = PositionTableConfig.columns.map(col =>
+        col.key === 'is_salary_fixed'
+            ? { ...col, render: (row: any) => <span>{row.is_salary_fixed_display}</span> }
+            : col,
+    );
+
+    // ── Render ────────────────────────────────────────────────────────────────
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Positions" />
-            {/* <CustomToast /> */}
 
             <div className="flex flex-col gap-4 p-4 min-h-[calc(85vh-48px)] mx-4">
 
@@ -234,10 +222,8 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
                     </Link>
                 </div>
 
-                {/* Content */}
                 <div className="flex flex-col gap-4">
-                    {/* Show empty state when no positions exist at all */}
-                    {hasNoPositions && !hasActiveFilters ? (
+                    {hasNoPositions ? (
                         <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
                             <div className="rounded-full bg-gray-100 p-6 mb-4">
                                 <Briefcase className="h-12 w-12 text-gray-400" />
@@ -247,9 +233,7 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
                                 Get started by creating your first position. Define job titles and their corresponding basic salaries.
                             </p>
                             <Link href="/positions/create">
-                                <Button className="gap-2">
-                                    Create Your First Position
-                                </Button>
+                                <Button className="gap-2">Create Your First Position</Button>
                             </Link>
                         </div>
                     ) : (
@@ -258,7 +242,7 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
                                 title="Position Lists"
                                 columns={updatedColumns}
                                 actions={PositionTableConfig.actions}
-                                data={filteredPositions}
+                                data={transformedPositions}
                                 from={positions.from ?? 1}
                                 onDelete={handleDeleteClick}
                                 onView={() => { }}
@@ -305,6 +289,7 @@ export default function Index({ positions, filters = { search: '', perPage: '10'
                                 pagination={positions}
                                 perPage={data.perPage}
                                 onPerPageChange={handlePerPageChange}
+                                onPageChange={handlePageChange}
                                 totalCount={totalCount}
                                 filteredCount={filteredCount}
                                 search={data.search}
