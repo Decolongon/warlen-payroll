@@ -10,6 +10,7 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Response;
 use Inertia\Inertia;
 use Inertia\Middleware\EncryptHistory;
+use Ricventu\LaravelAntiXss\Http\Middleware\CleanXssInput;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -35,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             EncryptHistory::class,
+            CleanXssInput::class,
         ]);
     })
 
