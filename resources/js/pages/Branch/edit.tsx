@@ -83,6 +83,7 @@ export default function Edit({ branch }: Props) {
 	const breadcrumbs: BreadcrumbItem[] = [
 		{ title: 'Branches', href: '/branches' },
 		{ title: 'Edit', href: `/branches/${branch.branch_slug}/edit` },
+		{ title: branch.branch_name, href: `/branches/${branch.branch_slug}` },
 	];
 
 	return (

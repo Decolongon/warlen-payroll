@@ -38,6 +38,8 @@ class EmployeeController extends Controller
     
         $allPositions = $employees->pluck('position.pos_name')->filter()->unique()->sort()->values()->all();
     
+        // ── Apply status filter on the collection BEFORE paginating ─────────────
+        // Supports any of: active | end_of_contract | awol | terminated | resigned | newly_hired
         $filteredEmployees = collect($employees);
     
         if ($request->filled('status')) {

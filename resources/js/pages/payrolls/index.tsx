@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { BreadcrumbItem } from '@/types';
-import { X, Bell, Search, Printer, Mail } from 'lucide-react';
+import { X, Bell, Search, Printer, Mail, Banknote } from 'lucide-react';
 import PayrollProcessingCards from '@/components/payroll-processing-cards';
 import { CustomTable } from '@/components/custom-table';
 import { CustomPagination } from '@/components/custom-pagination';
@@ -612,29 +612,33 @@ export default function Index({
     // ── Header actions (live in the blue table header bar) ────────────────────
     const headerActions = useMemo(() => (
         <>
-            {selectedPayrollIds.length > 0 && (
-                <Button
-                    onClick={() => handleBulkEmail(selectedPayrollIds)}
-                    variant="ghost"
-                    size="sm"
-                    className="cursor-pointer text-white/80 hover:text-white hover:bg-white/15 border border-white/20 hover:border-white/40 text-[12px] h-7 px-3"
-                >
-                    <Mail className="h-3.5 w-3.5 mr-1.5" />
-                    Email Selected
-                    <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white text-[#1d4791] text-[9px] font-black">
-                        {selectedPayrollIds.length}
-                    </span>
-                </Button>
+            {selectedPayrollIds.length >= 1 && (
+                <>
+                    <Button
+                        onClick={() => handleBulkEmail(selectedPayrollIds)}
+                        variant="ghost"
+                        size="sm"
+                        className="cursor-pointer text-white/80 hover:text-white hover:bg-white/15 border border-white/20 hover:border-white/40 text-[12px] h-7 px-3"
+                    >
+                        <Mail className="h-3.5 w-3.5 mr-1.5" />
+                        Email Selected
+                        <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white text-[#1d4791] text-[9px] font-black">
+                            {selectedPayrollIds.length}
+                        </span>
+                    </Button>
+
+                    <Button
+                        onClick={handlePrintSummary}
+                        variant="ghost"
+                        size="sm"
+                        className="cursor-pointer text-white/80 hover:text-white hover:bg-white/15 border border-white/20 hover:border-white/40 text-[12px] h-7 px-3"
+                    >
+                        <Printer className="h-3.5 w-3.5 mr-1.5" />
+                        Print Summary
+                    </Button>
+                </>
             )}
-            <Button
-                onClick={handlePrintSummary}
-                variant="ghost"
-                size="sm"
-                className="cursor-pointer text-white/80 hover:text-white hover:bg-white/15 border border-white/20 hover:border-white/40 text-[12px] h-7 px-3"
-            >
-                <Printer className="h-3.5 w-3.5 mr-1.5" />
-                Print Summary
-            </Button>
+
         </>
     ), [selectedPayrollIds, handleBulkEmail, handlePrintSummary]);
 
@@ -730,24 +734,29 @@ export default function Index({
                             selectedIds={selectedPayrollIds}
                             onSelectChange={setSelectedPayrollIds}
                             selectAll={selectAll}
-                            filterEmptyState={
+                            emptyState={
                                 <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                        <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                                        <Banknote className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                                     </div>
-                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                        No results found
-                                    </h3>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No payroll periods yet.</h3>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                        {searchTerm
-                                            ? `No payroll records matching "${searchTerm}".`
-                                            : dateFrom || dateTo
-                                                ? 'No payroll records in the selected date range.'
-                                                : 'No payroll records match your current filters.'}
+                                        Please complete the process to display the payrolls.
                                     </p>
-                                    <Button variant="outline" size="sm" onClick={clearFilters}>
-                                        Clear filters
-                                    </Button>
+                                </div>
+                            }
+                            filterEmptyState={
+                                <div className="flex flex-col items-center justify-center rounded-2xl py-16 text-center">
+                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                                        <Banknote className="h-6 w-6 text-primary/50" />
+                                    </div>
+                                    <p className="text-base font-semibold text-muted-foreground">No periods match this filter</p>
+                                    <button
+                                        onClick={clearFilters}
+                                        className="mt-4 rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                    >
+                                        Clear Filters
+                                    </button>
                                 </div>
                             }
                             isLoading={isFiltering && !isInitialLoad}

@@ -56,6 +56,8 @@ interface CustomTableProps {
     toolbar?: React.ReactNode;
     headerActions?: React.ReactNode;
     filterEmptyState?: React.ReactNode;
+    emptyState?: React.ReactNode;
+    hasActiveFilters?: boolean;
     isLoading?: boolean;
 
     // bulk selection props
@@ -438,6 +440,8 @@ export const CustomTable = ({
     title,
     toolbar,
     filterEmptyState,
+    emptyState,
+    hasActiveFilters = false,
     isLoading = false,
     selectable = false,
     selectedIds = [],
@@ -579,6 +583,7 @@ export const CustomTable = ({
         return (
             <div className="w-full font-sans">
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                    {/* Header bar */}
                     <div className="flex items-center gap-3 px-5 py-4 bg-[#1d4791] dark:bg-[#1d4791]">
                         <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
                             <LucidIcons.Table2 className="w-4 h-4 text-white" strokeWidth={1.75} />
@@ -608,7 +613,12 @@ export const CustomTable = ({
                             {toolbar}
                         </div>
                     )}
-                    {filterEmptyState ?? <EmptyState />}
+
+                    {/* UPDATED: Show appropriate empty state */}
+                    {hasActiveFilters
+                        ? (filterEmptyState || <EmptyState />)
+                        : (emptyState || <EmptyState />)
+                    }
                 </div>
             </div>
         );

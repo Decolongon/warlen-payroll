@@ -13,16 +13,7 @@ import type { BreadcrumbItem } from '@/types';
 import { ArrowLeft, Briefcase, CheckCircle, DollarSign, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Positions',
-        href: '/positions/edit',
-    },
-    {
-        title: 'Update Position',
-        href: '#',
-    },
-];
+
 
 interface Position {
     pos_slug: string;
@@ -37,6 +28,21 @@ interface PageProps {
 }
 
 export default function Update({ position }: PageProps) {
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Positions',
+            href: '/positions/edit',
+        },
+        {
+            title: 'Update Position',
+            href: '#',
+        },
+        {
+            title: position.pos_name,
+            href: '#'
+        }
+    ];
+
     const { data, setData, put, processing, errors } = useForm({
         pos_name: position.pos_name,
         basic_salary: position.basic_salary,

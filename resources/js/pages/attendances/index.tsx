@@ -980,7 +980,7 @@ export default function AttendanceManagement({
                                 <div className='pp-row'>
                                     <TableSkeleton
                                         columns={getSkeletonColumns()}
-                                        rows={parseInt(data.perPage)}
+                                        rows={current.data.length > 0 ? current.data.length : parseInt(data.perPage)}
                                         title={current.title || currentMainTab.label}
                                         animationDuration={800}
                                     />
@@ -1001,6 +1001,37 @@ export default function AttendanceManagement({
                                         onView={() => { }}
                                         onEdit={() => { }}
                                         title={current.title || currentMainTab.label}
+                                        hasActiveFilters={!!localSearch}
+                                        searchTerm={localSearch}
+                                        emptyState={
+                                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                                    {activeMainTab === 'logs' && <ScrollText className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                    {activeMainTab === 'exceptions' && <ChartSpline className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                    {activeMainTab === 'schedules' && <Clock className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                    {activeMainTab === 'periods' && <Calendar className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                </div>
+                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                                    {
+                                                        {
+                                                            'logs': 'No attendance logs yet.',
+                                                            'exceptions': 'No attendance exceptions yet.',
+                                                            'schedules': 'No attendance schedules yet.',
+                                                            'periods': 'No attendance period stats yet.',
+                                                        }[activeMainTab] || 'No results found.'
+                                                    }
+                                                </h3>
+
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                    Please import the attendance to get started.
+                                                </p>
+                                                {localSearch && (
+                                                    <Button variant="outline" size="sm" onClick={handleResetFilters}>
+                                                        Clear filters
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        }
                                         filterEmptyState={
                                             <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
                                                 <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">

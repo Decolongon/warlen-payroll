@@ -1,6 +1,10 @@
 import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
+<<<<<<< HEAD
+import { Users, Search, UserPlus, Archive, CircleUser, RotateCcw, Briefcase, Building2, Plus, X } from 'lucide-react';
+=======
 import { Users, Search, UserPlus, Archive, UsersRound, RotateCcw, Briefcase, Building2 } from 'lucide-react';
+>>>>>>> 91360a15993c9d9665abaa9bd773b8975e392ff1
 import { useState, useRef, useMemo, useEffect } from 'react';
 import EmployeeController from '@/actions/App/Http/Controllers/EmployeeController';
 import { CustomHeader } from '@/components/custom-header';
@@ -19,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import branches from '@/routes/branches';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Employees', href: '/employees' }];
 
@@ -507,18 +512,21 @@ export default function Index({
             {/* Page header */}
             <div className="grid grid-rows-1 justify-center mx-8 md:mx-8 mt-3 lg:flex lg:justify-between items-center lg:mx-8 lg:mt-4 lg:-mb-2 pp-header">
                 <CustomHeader
-                    icon={<Users />}
+                    icon={<CircleUser />}
                     title="Employees"
                     description="Manage your workforce: add, edit, and organize employee records with ease."
                 />
+
+                {employees.total >= 1 && (
                 <Link href="/employees/create">
                     <Button className="hover:cursor-pointer flex ml-auto">
                         <UserPlus className="h-5 w-5" />
                         <div className="flex flex-col items-start leading-tight">
-                            <span className="text-sm font-medium">Create Employee</span>
+                            <span className="text-sm font-medium"><Plus /> Add Employee</span>
                         </div>
                     </Button>
                 </Link>
+                )}
             </div>
 
             <div className="flex flex-1 flex-col gap-4 p-4 pp-row">
@@ -528,8 +536,11 @@ export default function Index({
                         {/* Mobile View */}
                         <div className="block sm:hidden">
                             <TabsList className="grid w-full grid-cols-2 gap-2 bg-transparent p-0">
-                                <TabsTrigger value="active" className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                                    <UsersRound className="h-5 w-5" />
+                                <TabsTrigger
+                                    value="active"
+                                    className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                                >
+                                    <CircleUser className="h-5 w-5" />
                                     <div className="flex items-center gap-1">
                                         <span className="text-xs font-medium">Active</span>
                                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{totalCount}</Badge>
@@ -548,8 +559,11 @@ export default function Index({
                         {/* Tablet View */}
                         <div className="hidden sm:block lg:hidden">
                             <TabsList className="grid w-full grid-cols-2 gap-2 bg-transparent p-0">
-                                <TabsTrigger value="active" className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                                    <UsersRound className="h-5 w-5" />
+                                <TabsTrigger
+                                    value="active"
+                                    className="flex flex-col items-center gap-1 py-3 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                                >
+                                    <CircleUser className="h-5 w-5" />
                                     <div className="flex items-center gap-1">
                                         <span className="text-xs font-medium">Active</span>
                                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{totalCount}</Badge>
@@ -569,7 +583,7 @@ export default function Index({
                         <div className="hidden lg:block">
                             <TabsList className="flex w-full max-w-md grid-cols-2 border-1">
                                 <TabsTrigger value="active" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:cursor-default data-[state=active]:text-primary-foreground rounded-lg transition-all cursor-pointer">
-                                    <UsersRound className="h-4 w-4" />
+                                    <CircleUser className="h-4 w-4" />
                                     Active Employees
                                     <Badge variant="secondary" className="ml-2">{totalCount}</Badge>
                                 </TabsTrigger>
@@ -583,119 +597,154 @@ export default function Index({
 
                         {/* ── Active Tab ──────────────────────────────────────────────────────── */}
                         <TabsContent value="active" className="mt-6">
-                            {employees.total === 0 && activeFiltersCount === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-center">
-                                    <div className="rounded-full bg-gray-100 p-6 mb-4">
-                                        <Users className="h-12 w-12 text-gray-400" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold mb-2">No employees yet</h3>
-                                    <p className="text-gray-500 mb-6 max-w-sm">Get started by creating your first employee.</p>
-                                    <Link href="/employees/create"><Button>Create Your First Employee</Button></Link>
-                                </div>
-                            ) : (
-                                <>
-                                    {selectedIds.length > 0 && activeTab === 'active' && (
-                                        <div className="mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                                                    <Archive className="h-4 w-4 text-red-600 dark:text-red-400" />
-                                                </div>
-                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                                    {selectedIds.length} employee{selectedIds.length !== 1 ? 's' : ''} selected
-                                                </span>
+                            <>
+                                {selectedIds.length > 0 && activeTab === 'active' && (
+                                    <div className="mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                                <Archive className="h-4 w-4 text-red-600 dark:text-red-400" />
                                             </div>
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                {hasAnyMissingPosition && (
-                                                    <Button variant="outline" size="sm" onClick={handleAssignPosition} className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30">
-                                                        <Briefcase className="h-4 w-4 mr-1" />Assign Position
-                                                    </Button>
-                                                )}
-                                                {hasAnyMissingBranchOrSite && (
-                                                    <Button variant="outline" size="sm" onClick={handleAssignBranchSite} className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/30">
-                                                        <Building2 className="h-4 w-4 mr-1" />Assign Branch & Site
-                                                    </Button>
-                                                )}
-                                                <Button variant="destructive" size="sm" onClick={handleBulkArchive} disabled={bulkLoading} className="shadow-sm">
-                                                    <Archive className="h-4 w-4 mr-1" />Move to Archive
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Cancel</Button>
-                                            </div>
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                {selectedIds.length} employee{selectedIds.length !== 1 ? 's' : ''} selected
+                                            </span>
                                         </div>
-                                    )}
-
-                                    <CustomTable
-                                        title="Employee Lists"
-                                        columns={EmployeesTableConfig.columns}
-                                        actions={EmployeesTableConfig.actions}
-                                        data={employees.data}
-                                        from={employees.from ?? 1}
-                                        onDelete={handleDeleteClick}
-                                        onView={handleView}
-                                        onEdit={handleEdit}
-                                        selectable={true}
-                                        selectedIds={selectedIds}
-                                        onSelectChange={setSelectedIds}
-                                        selectAll={selectedIds.length === employees.data.length && employees.data.length > 0}
-                                        toolbar={
-                                            <EmployeeFilterBar
-                                                filters={{ search: true, position: true, branch: true, site: true, date: true, status: true }}
-                                                allPositions={allPositions}
-                                                branchesData={activeBranchesData}
-                                                searchTerm={searchTerm}
-                                                selectedPositions={selectedPositions}
-                                                selectedBranch={selectedBranch}
-                                                selectedSite={selectedSite}
-                                                status={status}
-                                                dateFrom={dateFrom}
-                                                dateTo={dateTo}
-                                                onSearchChange={handleSearchChange}
-                                                onPositionsChange={handlePositionsChange}
-                                                onBranchChange={handleBranchChange}
-                                                onSiteChange={handleSiteChange}
-                                                onStatusChange={handleStatusChange}
-                                                onDateFromChange={handleDateFromChange}
-                                                onDateToChange={handleDateToChange}
-                                                onClearAll={clearActiveFilters}
-                                                searchPlaceholder="Search by ID or name..."
-                                                dateLabel="Hire Date"
-                                            />
-                                        }
-                                        filterEmptyState={
-                                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                                    <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-                                                </div>
-                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No results found</h3>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                    {searchTerm && selectedPositions.length > 0
-                                                        ? `No employees matching "${searchTerm}" in selected positions.`
-                                                        : searchTerm
-                                                        ? `No employees matching "${searchTerm}".`
-                                                        : selectedBranch && selectedSite
-                                                        ? `No employees in ${selectedBranch} / ${selectedSite}.`
-                                                        : selectedBranch
-                                                        ? `No employees in ${selectedBranch}.`
-                                                        : dateFrom || dateTo
-                                                        ? 'No employees in the selected date range.'
-                                                        : status
-                                                        ? 'No employees with the selected status.'
-                                                        : 'No employees match your current filters.'}
-                                                </p>
-                                                <Button variant="outline" size="sm" onClick={clearActiveFilters}>Clear filters</Button>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {hasAnyMissingPosition && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleAssignPosition}
+                                                    className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                                                >
+                                                    <Briefcase className="h-4 w-4 mr-1" />
+                                                    Assign Position
+                                                </Button>
+                                            )}
+                                            {hasAnyMissingBranchOrSite && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleAssignBranchSite}
+                                                    className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/30"
+                                                >
+                                                    <Building2 className="h-4 w-4 mr-1" />
+                                                    Assign Branch & Site
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                onClick={handleBulkArchive}
+                                                disabled={bulkLoading}
+                                                className="shadow-sm"
+                                            >
+                                                <Archive className="h-4 w-4 mr-1" />
+                                                Move to Archive
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                                <CustomTable
+                                    title="Employee Lists"
+                                    columns={EmployeesTableConfig.columns}
+                                    actions={EmployeesTableConfig.actions}
+                                    data={employees.data}
+                                    from={employees.from ?? 1}
+                                    onDelete={handleDeleteClick}
+                                    onView={handleView}
+                                    onEdit={handleEdit}
+                                    selectable={true}
+                                    selectedIds={selectedIds}
+                                    onSelectChange={setSelectedIds}
+                                    selectAll={selectedIds.length === employees.data.length && employees.data.length > 0}
+                                    searchTerm={searchTerm}
+                                    hasActiveFilters={activeFiltersCount > 0}
+                                    toolbar={
+                                        <EmployeeFilterBar
+                                            filters={{
+                                                search: true,
+                                                position: true,
+                                                branch: true,
+                                                site: true,
+                                                date: true,
+                                                status: true,
+                                            }}
+                                            allPositions={allPositions}
+                                            branchesData={activeBranchesData}
+                                            searchTerm={searchTerm}
+                                            selectedPositions={selectedPositions}
+                                            selectedBranch={selectedBranch}
+                                            selectedSite={selectedSite}
+                                            status={status}
+                                            dateFrom={dateFrom}
+                                            dateTo={dateTo}
+                                            onSearchChange={handleSearchChange}
+                                            onPositionsChange={handlePositionsChange}
+                                            onBranchChange={handleBranchChange}
+                                            onSiteChange={handleSiteChange}
+                                            onStatusChange={handleStatusChange}
+                                            onDateFromChange={handleDateFromChange}
+                                            onDateToChange={handleDateToChange}
+                                            onClearAll={clearActiveFilters}
+                                            searchPlaceholder="Search by ID or name..."
+                                            dateLabel="Hire Date"
+                                        />
+                                    }
+                                    filterEmptyState={
+                                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                                <X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                                             </div>
-                                        }
-                                    />
-                                    <CustomPagination
-                                        pagination={employees}
-                                        perPage={String(employees.perPage ?? 10)}
-                                        onPerPageChange={handlePerPageChange}
-                                        totalCount={totalCount}
-                                        filteredCount={filteredCount}
-                                        search={searchTerm}
-                                        resourceName="employee"
-                                    />
-                                </>
-                            )}
+                                            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                                No results found
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                {searchTerm && selectedPositions.length > 0
+                                                    ? `No employees matching "${searchTerm}" in selected positions.`
+                                                    : searchTerm
+                                                        ? `No employees matching "${searchTerm}".`
+                                                        : selectedBranch && selectedSite ? `No employees in ${selectedBranch} / ${selectedSite}.`
+                                                            : selectedBranch
+                                                                ? `No employees in ${selectedBranch}.`
+                                                                : dateFrom || dateTo
+                                                                    ? 'No employees in the selected date range.'
+                                                                    : 'No employees match your current filters.'}
+                                            </p>
+                                            <Button variant="outline" size="sm" className="cursor-pointer" onClick={clearActiveFilters}>
+                                                Clear filters
+                                            </Button>
+                                        </div>
+                                    }
+                                    emptyState={
+                                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                                <CircleUser className="h-5 w-5 text-slate-400 dark:text-slate-500" strokeWidth={1.75} />
+                                            </div>
+                                            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                                No employees yet.
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                Get started by creating your first employee.
+                                            </p>
+                                            <Link href="/employees/create">
+                                                <Button><Plus /> Add Employee</Button>
+                                            </Link>
+                                        </div>
+                                    }
+                                />
+                                <CustomPagination
+                                    pagination={employees}
+                                    perPage={String(employees.perPage ?? 10)}
+                                    onPerPageChange={handlePerPageChange}
+                                    totalCount={totalCount}
+                                    filteredCount={filteredCount}
+                                    search={searchTerm}
+                                    resourceName="employee"
+                                />
+                            </>
                         </TabsContent>
 
                         {/* ── Archived Tab ────────────────────────────────────────────────────── */}
