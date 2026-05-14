@@ -19,6 +19,7 @@
         "laravel/wayfinder": "^0.1.13",
         "openai-php/laravel": "^0.19.1",
         "phpoffice/phpspreadsheet": "^5.5",
+        "ricventu/laravel-anti-xss": "*",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-permission": "^7.2",
         "tightenco/ziggy": "^2.6"
