@@ -36,10 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             // EncryptHistory::class,
-<<<<<<< HEAD
             CleanXssInput::class,
-=======
->>>>>>> 6cb3f794e68b97fcdaa3927e0ce9a138a5f1b7bc
         ]);
     })
 
