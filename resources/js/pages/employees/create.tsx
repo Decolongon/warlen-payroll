@@ -755,7 +755,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.contact_person} />
                                 </div>
-                                <div className="space-y-2 sm:col-span-2">
+                                <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Contact Person Number</Label>
                                     <PhoneInput
                                         value={data.contact_person_number}
@@ -772,7 +772,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">SSS Number </Label>
                                     <Input
-                                        type="text"
+                                        type="password"
                                         value={data.sss_number}
                                         onChange={e => handleGovNumberChange('sss_number', e.target.value, 15)}
                                         placeholder="e.g., 12-3456789-1"
@@ -784,7 +784,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Pag-IBIG Membership ID </Label>
                                     <Input
-                                        type="text"
+                                        type="password"
                                         value={data.pagibig_number}
                                         onChange={e => handleGovNumberChange('pagibig_number', e.target.value, 15)}
                                         placeholder="e.g., 9102-1234-5678"
@@ -796,7 +796,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">PhilHealth ID Number (PIN)</Label>
                                     <Input
-                                        type="text"
+                                        type="password"
                                         value={data.philhealth_number}
                                         onChange={e => handleGovNumberChange('philhealth_number', e.target.value, 15)}
                                         placeholder="e.g., 9102-1234-5678"
@@ -808,7 +808,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">TIN Number </Label>
                                     <Input
-                                        type="text"
+                                        type="password"
                                         value={data.tin_number}
                                         onChange={e => handleGovNumberChange('tin_number', e.target.value, 15)}
                                         placeholder="e.g., 123-456-789-000"
@@ -820,49 +820,20 @@ export default function Create({ positions, branches, site = [] }: Props) {
                             </div>
                         </FormSection>
 
-                        {/* 7. Contract Period */}
-                        <FormSection icon={Calendar} title="Contract Period" index={7}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">Start Date <span className="text-destructive">*</span></Label>
-                                    <input
-                                        type="date"
-                                        value={data.contract_start_date}
-                                        onChange={e => setData('contract_start_date', e.target.value)}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                                    />
-                                    <InputError message={errors.contract_start_date} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">End Date </Label>
-                                    <input
-                                        type="date"
-                                        value={data.contract_end_date}
-                                        onChange={e => setData('contract_end_date', e.target.value)}
-                                        min={data.contract_start_date || undefined}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                                    />
-                                    <InputError message={errors.contract_end_date} />
-                                </div>
-                                {/* HUMAN-READABLE DURATION */}
-                                <div className="sm:col-span-2">
-                                    <Label className="text-sm font-semibold">Contract Duration</Label>
-                                    <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
-                                        {contractDuration}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Auto‑calculated from contract dates</p>
-                                </div>
-                            </div>
-                        </FormSection>
 
                         {/* 8. Location Assignment */}
-                        <FormSection icon={MapPin} title="Location Assignment" index={8}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <FormSection icon={MapPin} title="Assignment & Contract Period" index={7}>
+                            <div className="space-y-6">
+                                {/* Location row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <SearchableDropdown
                                     label="Branch"
                                     items={filteredBranches}
                                     selectedId={data.branch_id}
-                                    onSelect={(id, name) => { setData('branch_id', id); setBranchSearch(name); }}
+                                    onSelect={(id, name) => {
+                                    setData('branch_id', id);
+                                    setBranchSearch(name);
+                                    }}
                                     searchValue={branchSearch}
                                     onSearchChange={setBranchSearch}
                                     required
@@ -870,21 +841,63 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     placeholder="Select a branch"
                                     searchPlaceholder="Search branches..."
                                 />
+
                                 {data.branch_id && (
                                     <SearchableDropdown
-                                        label="Site"
-                                        items={filteredSites}
-                                        selectedId={data.site_id}
-                                        onSelect={(id, name) => { setData('site_id', id); setSiteSearch(name); }}
-                                        searchValue={siteSearch}
-                                        onSearchChange={setSiteSearch}
-                                        required
-                                        error={errors.site_id}
-                                        placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
-                                        searchPlaceholder="Search sites..."
-                                        disabled={availableSites.length === 0}
+                                    label="Site"
+                                    items={filteredSites}
+                                    selectedId={data.site_id}
+                                    onSelect={(id, name) => {
+                                        setData('site_id', id);
+                                        setSiteSearch(name);
+                                    }}
+                                    searchValue={siteSearch}
+                                    onSearchChange={setSiteSearch}
+                                    required
+                                    error={errors.site_id}
+                                    placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
+                                    searchPlaceholder="Search sites..."
+                                    disabled={availableSites.length === 0}
                                     />
                                 )}
+                                </div>
+
+                                {/* Contract period row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">
+                                    Start Date <span className="text-destructive">*</span>
+                                    </Label>
+                                    <input
+                                    type="date"
+                                    value={data.contract_start_date}
+                                    onChange={(e) => setData('contract_start_date', e.target.value)}
+                                    className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                    />
+                                    <InputError message={errors.contract_start_date} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">End Date</Label>
+                                    <input
+                                    type="date"
+                                    value={data.contract_end_date}
+                                    onChange={(e) => setData('contract_end_date', e.target.value)}
+                                    min={data.contract_start_date || undefined}
+                                    className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                    />
+                                    <InputError message={errors.contract_end_date} />
+                                </div>
+
+                                {/* Human‑readable duration */}
+                                <div className="sm:col-span-2">
+                                    <Label className="text-sm font-semibold">Contract Duration</Label>
+                                    <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
+                                    {contractDuration}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Auto‑calculated from contract dates</p>
+                                </div>
+                                </div>
                             </div>
                         </FormSection>
 

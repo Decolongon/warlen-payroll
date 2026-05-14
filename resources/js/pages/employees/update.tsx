@@ -146,20 +146,18 @@ function SearchableDropdown({
             </Label>
             <div className="relative">
                 <div
-                    className={`flex cursor-pointer items-center justify-between rounded-xl border-2 bg-background px-4 py-2.5 transition-all ${
-                        isOpen
-                            ? 'border-primary ring-2 ring-primary/20'
-                            : 'border-border hover:border-primary/50'
-                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                    className={`flex cursor-pointer items-center justify-between rounded-xl border-2 bg-background px-4 py-2.5 transition-all ${isOpen
+                        ? 'border-primary ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/50'
+                        } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                 >
                     <span className={`text-sm ${!selectedItem ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {selectedItem?.name || placeholder}
                     </span>
                     <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${
-                            isOpen ? 'rotate-180' : ''
-                        }`}
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''
+                            }`}
                     />
                 </div>
 
@@ -769,17 +767,6 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                         {/* 5. Employee Details */}
                         <FormSection icon={Briefcase} title="Employee Details" index={5}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">
-                                        Contact Number <span className="text-destructive">*</span>
-                                    </Label>
-                                    <PhoneInput
-                                        value={data.employee_number}
-                                        onChange={(val) => setData('employee_number', val)}
-                                        error={errors.employee_number}
-                                    />
-                                </div>
-
                                 <SearchableDropdown
                                     label="Position"
                                     items={filteredPositions}
@@ -831,6 +818,17 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
 
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
+                                        Contact Number <span className="text-destructive">*</span>
+                                    </Label>
+                                    <PhoneInput
+                                        value={data.employee_number}
+                                        onChange={(val) => setData('employee_number', val)}
+                                        error={errors.employee_number}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">
                                         Emergency Contact Number <span className="text-destructive">*</span>
                                     </Label>
                                     <PhoneInput
@@ -852,7 +850,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <InputError message={errors.contact_person} />
                                 </div>
 
-                                <div className="space-y-2 sm:col-span-2">
+                                <div className="space-y-2">
                                     <Label className="text-sm font-semibold">Contact Person Number</Label>
                                     <PhoneInput
                                         value={data.contact_person_number}
@@ -868,7 +866,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        SSS Number 
+                                        SSS Number
                                     </Label>
                                     <div className="relative">
                                         <Input
@@ -892,7 +890,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
 
                                 <div className="space-y-2">
                                     <Label className="text-sm font-semibold">
-                                        Pag-IBIG Membership ID 
+                                        Pag-IBIG Membership ID
                                     </Label>
                                     <div className="relative">
                                         <Input
@@ -964,80 +962,81 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             </div>
                         </FormSection>
 
-                        <FormSection icon={MapPin} title="Location Assignment" index={8}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <SearchableDropdown
-                                    label="Branch"
-                                    items={filteredBranches}
-                                    selectedId={data.branch_id}
-                                    onSelect={(id, name) => {
-                                        setData('branch_id', id);
-                                        setBranchSearch(name);
-                                    }}
-                                    searchValue={branchSearch}
-                                    onSearchChange={setBranchSearch}
-                                    required
-                                    error={errors.branch_id}
-                                    placeholder="Select a branch"
-                                    searchPlaceholder="Search branches..."
-                                />
-
-                                {data.branch_id && (
+                        <FormSection icon={MapPin} title="Assignment & Contract Period" index={7}>
+                            <div className="space-y-6">
+                                {/* Location row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <SearchableDropdown
-                                        label="Site"
-                                        items={filteredSites}
-                                        selectedId={data.site_id}
+                                        label="Branch"
+                                        items={filteredBranches}
+                                        selectedId={data.branch_id}
                                         onSelect={(id, name) => {
-                                            setData('site_id', id);
-                                            setSiteSearch(name);
+                                            setData('branch_id', id);
+                                            setBranchSearch(name);
                                         }}
-                                        searchValue={siteSearch}
-                                        onSearchChange={setSiteSearch}
+                                        searchValue={branchSearch}
+                                        onSearchChange={setBranchSearch}
                                         required
-                                        error={errors.site_id}
-                                        placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
-                                        searchPlaceholder="Search sites..."
-                                        disabled={availableSites.length === 0}
+                                        error={errors.branch_id}
+                                        placeholder="Select a branch"
+                                        searchPlaceholder="Search branches..."
                                     />
-                                )}
-                            </div>
-                        </FormSection>
 
-                        {/* 7. Contract Period - NATIVE DATE INPUTS */}
-                        <FormSection icon={Calendar} title="Contract Period" index={7}>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">
-                                        Start Date <span className="text-destructive">*</span>
-                                    </Label>
-                                    <input
-                                        type="date"
-                                        value={data.contract_start_date}
-                                        onChange={(e) => setData('contract_start_date', e.target.value)}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                                    />
-                                    <InputError message={errors.contract_start_date} />
+                                    {data.branch_id && (
+                                        <SearchableDropdown
+                                            label="Site"
+                                            items={filteredSites}
+                                            selectedId={data.site_id}
+                                            onSelect={(id, name) => {
+                                                setData('site_id', id);
+                                                setSiteSearch(name);
+                                            }}
+                                            searchValue={siteSearch}
+                                            onSearchChange={setSiteSearch}
+                                            required
+                                            error={errors.site_id}
+                                            placeholder={availableSites.length === 0 ? 'No sites for this branch' : 'Select a site'}
+                                            searchPlaceholder="Search sites..."
+                                            disabled={availableSites.length === 0}
+                                        />
+                                    )}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">
-                                        End Date <span className="text-destructive">*</span>
-                                    </Label>
-                                    <input
-                                        type="date"
-                                        value={data.contract_end_date}
-                                        onChange={(e) => setData('contract_end_date', e.target.value)}
-                                        min={data.contract_start_date || undefined}
-                                        className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                                    />
-                                    <InputError message={errors.contract_end_date} />
-                                </div>
-                                {/* Duration display - HUMAN READABLE */}
-                                <div className="sm:col-span-2">
-                                    <Label className="text-sm font-semibold">Contract Duration</Label>
-                                    <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
-                                        {contractDuration}
+
+                                {/* Contract period row */}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold">
+                                            Start Date <span className="text-destructive">*</span>
+                                        </Label>
+                                        <input
+                                            type="date"
+                                            value={data.contract_start_date}
+                                            onChange={(e) => setData('contract_start_date', e.target.value)}
+                                            className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                        />
+                                        <InputError message={errors.contract_start_date} />
                                     </div>
-                                    <p className="text-xs text-muted-foreground">Auto‑calculated from contract dates</p>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold">
+                                            End Date <span className="text-destructive">*</span>
+                                        </Label>
+                                        <input
+                                            type="date"
+                                            value={data.contract_end_date}
+                                            onChange={(e) => setData('contract_end_date', e.target.value)}
+                                            min={data.contract_start_date || undefined}
+                                            className="w-full rounded-xl border-2 border-border bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                        />
+                                        <InputError message={errors.contract_end_date} />
+                                    </div>
+                                    {/* Duration display - HUMAN READABLE */}
+                                    <div className="sm:col-span-2">
+                                        <Label className="text-sm font-semibold">Contract Duration</Label>
+                                        <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">
+                                            {contractDuration}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">Auto‑calculated from contract dates</p>
+                                    </div>
                                 </div>
                             </div>
                         </FormSection>
