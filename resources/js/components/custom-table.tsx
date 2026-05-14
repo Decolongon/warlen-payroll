@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "./ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 interface TableColumn {
@@ -21,6 +21,8 @@ interface TableColumn {
     isAction?: boolean;
     className?: string;
     isDate?: boolean;
+    toggleable?: boolean;
+    defaultVisible?: boolean;
 }
 
 interface ActionConfig {
@@ -149,7 +151,7 @@ function CellValue({ col, row }: { col: TableColumn; row: TableRow }) {
     );
 }
 
-// ─── EmptyState: only the body content, no header bar ──────────────────
+// ─── EmptyState ─────────────────────────────────────────────────────────
 function EmptyState() {
     return (
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
@@ -166,6 +168,7 @@ function EmptyState() {
     );
 }
 
+// ─── ActionDropdown ──────────────────────────────────────────────────────
 function ActionDropdown({
     row,
     actions,
@@ -259,7 +262,7 @@ function ActionDropdown({
                         <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
                     )}
 
-                    {/* Non-destructive actions (View, Edit, etc.) */}
+                    {/* Non-destructive actions */}
                     {nonDestructive.map((action, i) => {
                         const Icon = LucidIcons[action.icon] as React.ElementType;
                         return (
@@ -333,6 +336,89 @@ function ActionDropdown({
     );
 }
 
+// ─── Column Toggle Dropdown ──────────────────────────────────────────────
+function ColumnToggleDropdown({
+    toggleableColumns,
+    hiddenColumns,
+    onToggle,
+    onReset,
+}: {
+    toggleableColumns: TableColumn[];
+    hiddenColumns: Set<string>;
+    onToggle: (key: string) => void;
+    onReset: () => void;
+}) {
+    const hiddenCount = toggleableColumns.filter(col => hiddenColumns.has(col.key)).length;
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
+                    <LucidIcons.Columns3 className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Columns</span>
+                    {hiddenCount > 0 && (
+                        <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/30 text-white text-[10px] font-black">
+                            {hiddenCount}
+                        </span>
+                    )}
+                </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+                align="end"
+                className="min-w-[200px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl shadow-slate-900/10 dark:shadow-slate-950/40 p-1"
+            >
+                {/* Header label */}
+                <div className="px-3 py-1.5 mb-0.5">
+                    <p className="text-[10px] font-black tracking-widest uppercase text-slate-400 dark:text-slate-500">
+                        Toggle columns
+                    </p>
+                </div>
+
+                {toggleableColumns.map(col => {
+                    const isVisible = !hiddenColumns.has(col.key);
+                    return (
+                        <DropdownMenuItem
+                            key={col.key}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                onToggle(col.key);
+                            }}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-[#1d4791]/8 dark:hover:bg-[#1d4791]/20 hover:text-[#1d4791] dark:hover:text-blue-300 cursor-pointer transition-colors focus:bg-[#1d4791]/8 focus:text-[#1d4791]"
+                        >
+                            {/* Custom checkbox */}
+                            <div
+                                className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                                    isVisible
+                                        ? 'bg-[#1d4791] border-[#1d4791]'
+                                        : 'border-slate-300 dark:border-slate-600 bg-transparent'
+                                }`}
+                            >
+                                {isVisible && (
+                                    <LucidIcons.Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                                )}
+                            </div>
+                            <span className={isVisible ? '' : 'text-slate-400 dark:text-slate-500'}>
+                                {col.label}
+                            </span>
+                        </DropdownMenuItem>
+                    );
+                })}
+
+                <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+
+                <DropdownMenuItem
+                    onClick={onReset}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors"
+                >
+                    <LucidIcons.RotateCcw className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.75} />
+                    Reset to default
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────
 export const CustomTable = ({
     columns,
@@ -362,10 +448,50 @@ export const CustomTable = ({
     headerActions,
 }: CustomTableProps) => {
     const route = useRoute();
-    const dataColumns = columns.filter(col => !col.isAction);
-    const hasActions = columns.some(col => col.isAction);
+
+    // ── Column visibility state ──────────────────────────────────────────
+    const defaultHidden = useMemo(() => {
+        const set = new Set<string>();
+        columns.forEach(col => {
+            if (col.toggleable && col.defaultVisible === false) {
+                set.add(col.key);
+            }
+        });
+        return set;
+    }, [columns]);
+
+    const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(defaultHidden);
+
+    const toggleColumn = (key: string) => {
+        setHiddenColumns(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+
+    const resetColumns = () => {
+        setHiddenColumns(defaultHidden);
+    };
+
+    // Columns filtered by visibility — non-toggleable cols always visible
+    const visibleColumns = useMemo(
+        () => columns.filter(col => !col.toggleable || !hiddenColumns.has(col.key)),
+        [columns, hiddenColumns]
+    );
+
+    const toggleableColumns = useMemo(
+        () => columns.filter(col => col.toggleable && !col.isAction),
+        [columns]
+    );
+
+    // ── Derived column sets ──────────────────────────────────────────────
+    const dataColumns = visibleColumns.filter(col => !col.isAction);
+    const hasActions = visibleColumns.some(col => col.isAction);
     const actionProps = { actions, onDelete, onView, onEdit, onRestore, onRunPayroll, onEmail, route };
 
+    // ── Bulk selection ───────────────────────────────────────────────────
     const selectedRows = data.filter(row => selectedIds.includes(row.id));
     const selectedRowsRef = useRef<TableRow[]>(selectedRows);
     useEffect(() => {
@@ -393,6 +519,7 @@ export const CustomTable = ({
         onSelectChange(newSelected);
     };
 
+    // ── Record display helpers ───────────────────────────────────────────
     const getHeaderRecordDisplayText = () => {
         if (searchTerm && filteredCount !== undefined && totalCount !== undefined) {
             return (
@@ -405,7 +532,6 @@ export const CustomTable = ({
                 </>
             );
         }
-
         if (total !== undefined && total > 0) {
             return (
                 <>
@@ -414,7 +540,6 @@ export const CustomTable = ({
                 </>
             );
         }
-
         return (
             <>
                 Showing <span className="font-black text-white">{data.length}</span> records
@@ -434,7 +559,6 @@ export const CustomTable = ({
                 </>
             );
         }
-
         if (total !== undefined && total > 0) {
             return (
                 <>
@@ -443,7 +567,6 @@ export const CustomTable = ({
                 </>
             );
         }
-
         return (
             <>
                 Showing <span className="font-black text-gray-600 dark:text-gray-300">{data.length}</span> records
@@ -451,12 +574,11 @@ export const CustomTable = ({
         );
     };
 
-    // ── Empty state (no data) ──────────────────────────────────────────
+    // ── Empty state ──────────────────────────────────────────────────────
     if (!data || data.length === 0) {
         return (
             <div className="w-full font-sans">
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-                    {/* Header bar — title & headerActions passed directly here, in scope */}
                     <div className="flex items-center gap-3 px-5 py-4 bg-[#1d4791] dark:bg-[#1d4791]">
                         <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
                             <LucidIcons.Table2 className="w-4 h-4 text-white" strokeWidth={1.75} />
@@ -465,32 +587,34 @@ export const CustomTable = ({
                             <p className="text-[13px] font-bold text-white leading-tight truncate">
                                 {title ?? "Data Table"}
                             </p>
-                            <p className="text-[11px] text-blue-200/60 mt-0.5">
-                                0 records
-                            </p>
+                            <p className="text-[11px] text-blue-200/60 mt-0.5">0 records</p>
                         </div>
+                        {toggleableColumns.length > 0 && (
+                            <ColumnToggleDropdown
+                                toggleableColumns={toggleableColumns}
+                                hiddenColumns={hiddenColumns}
+                                onToggle={toggleColumn}
+                                onReset={resetColumns}
+                            />
+                        )}
                         {headerActions && (
                             <div className="flex-shrink-0 flex items-center gap-2">
                                 {headerActions}
                             </div>
                         )}
                     </div>
-
-                    {/* Toolbar */}
                     {toolbar && (
                         <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
                             {toolbar}
                         </div>
                     )}
-
-                    {/* FIX: pass title and headerActions as props to EmptyState */}
                     {filterEmptyState ?? <EmptyState />}
                 </div>
             </div>
         );
     }
 
-    // ── MOBILE VIEW (<768px) ────────────────────────────────────────────
+    // ── MOBILE VIEW (<768px) ─────────────────────────────────────────────
     const MobileView = () => (
         <div className="block md:hidden">
             {hasSelected && (
@@ -524,8 +648,9 @@ export const CustomTable = ({
                 {data.map((row, index) => (
                     <div
                         key={row.id || index}
-                        className={`px-4 py-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150 ${selectedIds.includes(row.id) ? 'bg-blue-50 dark:bg-blue-950/30' : ''
-                            }`}
+                        className={`px-4 py-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150 ${
+                            selectedIds.includes(row.id) ? 'bg-blue-50 dark:bg-blue-950/30' : ''
+                        }`}
                     >
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
@@ -537,12 +662,7 @@ export const CustomTable = ({
                                 )}
                                 <IndexBadge value={from + index} />
                             </div>
-                            {hasActions && (
-                                <ActionDropdown
-                                    {...actionProps}
-                                    row={row}
-                                />
-                            )}
+                            {hasActions && <ActionDropdown {...actionProps} row={row} />}
                         </div>
 
                         <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -563,7 +683,7 @@ export const CustomTable = ({
         </div>
     );
 
-    // ── TABLET VIEW (768px–1023px) ──────────────────────────────────────
+    // ── TABLET VIEW (768px–1023px) ───────────────────────────────────────
     const TabletView = () => (
         <div className="hidden md:block lg:hidden">
             {hasSelected && (
@@ -597,8 +717,9 @@ export const CustomTable = ({
                 {data.map((row, index) => (
                     <div
                         key={row.id || index}
-                        className={`rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/60 p-4 hover:border-[#1d4791]/40 dark:hover:border-[#1d4791]/50 hover:shadow-md transition-all duration-200 group ${selectedIds.includes(row.id) ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-950/30' : ''
-                            }`}
+                        className={`rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/60 p-4 hover:border-[#1d4791]/40 dark:hover:border-[#1d4791]/50 hover:shadow-md transition-all duration-200 group ${
+                            selectedIds.includes(row.id) ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-950/30' : ''
+                        }`}
                     >
                         <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-700/60">
                             <div className="flex items-center gap-3">
@@ -610,12 +731,7 @@ export const CustomTable = ({
                                 )}
                                 <IndexBadge value={from + index} />
                             </div>
-                            {hasActions && (
-                                <ActionDropdown
-                                    {...actionProps}
-                                    row={row}
-                                />
-                            )}
+                            {hasActions && <ActionDropdown {...actionProps} row={row} />}
                         </div>
 
                         <dl className="space-y-2">
@@ -636,7 +752,7 @@ export const CustomTable = ({
         </div>
     );
 
-    // ── DESKTOP VIEW (≥1024px) ─────────────────────────────────────────
+    // ── DESKTOP VIEW (≥1024px) ────────────────────────────────────────────
     const DesktopView = () => (
         <div className={`hidden lg:block overflow-x-auto ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
             <table className="w-full border-collapse text-[13px] text-slate-700 dark:text-slate-300">
@@ -650,7 +766,7 @@ export const CustomTable = ({
                                 />
                             </th>
                         )}
-                        {columns.map(col => (
+                        {visibleColumns.map(col => (
                             <th
                                 key={col.key}
                                 className={`px-4 py-3 text-left text-[10px] font-black tracking-widest uppercase whitespace-nowrap text-slate-500 dark:text-slate-400 ${col.className ?? ""}`}
@@ -674,7 +790,7 @@ export const CustomTable = ({
                                     />
                                 </td>
                             )}
-                            {columns.map(col => (
+                            {visibleColumns.map(col => (
                                 <td
                                     key={col.key}
                                     className={`px-4 py-3.5 align-middle text-left text-slate-700 dark:text-slate-300 overflow-hidden border-b ${col.className ?? ""}`}
@@ -696,6 +812,7 @@ export const CustomTable = ({
     return (
         <div className="w-full font-sans">
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+
                 {/* Header bar */}
                 <div className="flex items-center gap-3 px-5 py-4 bg-[#1d4791] dark:bg-[#1d4791]">
                     <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
@@ -709,11 +826,23 @@ export const CustomTable = ({
                             {getHeaderRecordDisplayText()}
                         </p>
                     </div>
+
                     {isLoading && (
                         <div className="flex-shrink-0">
                             <LucidIcons.Loader2 className="w-4 h-4 text-white/60 animate-spin" />
                         </div>
                     )}
+
+                    {/* Column toggle button — sits before headerActions */}
+                    {toggleableColumns.length > 0 && (
+                        <ColumnToggleDropdown
+                            toggleableColumns={toggleableColumns}
+                            hiddenColumns={hiddenColumns}
+                            onToggle={toggleColumn}
+                            onReset={resetColumns}
+                        />
+                    )}
+
                     {headerActions && (
                         <div className="flex-shrink-0 flex items-center gap-2">
                             {headerActions}
