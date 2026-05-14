@@ -194,7 +194,7 @@ export const getPayrollTableActions = (
             onClick: (row: PayrollTableRow) => handleViewPayroll(row),
         },
         {
-            label: 'Email',
+            label: 'Sent Email',
             icon: 'Mail',
             onClick: (row: PayrollTableRow) => handleEmailPayroll(row),
         },
