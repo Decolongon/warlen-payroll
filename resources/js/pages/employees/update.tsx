@@ -26,10 +26,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Employees', href: '/employees' },
-    { title: 'Edit', href: '/employees/edit' },
-];
+
 
 interface Props {
     positions: any[];
@@ -360,6 +357,13 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
     const [showPhilhealth, setShowPhilhealth] = useState(false);
     const [showTin, setShowTin] = useState(false);
 
+    const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Employees', href: '/employees' },
+    { title: 'Edit', href: '/employees/edit' },
+    { title: employee.user.name, href: `/employees/${employee.id}` },
+];
+
+    // Parse skills safely (handle JSON string from DB)
     const parseSkills = (skillsData: any): string[] => {
         if (Array.isArray(skillsData)) return skillsData;
         if (typeof skillsData === 'string' && skillsData) {

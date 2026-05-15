@@ -9,6 +9,14 @@ export const PositionTableConfig = {
             label: 'Minimum Salary',
             key: 'basic_salary',
             className: 'border px-4 py-3',
+            render: (value: any) => {
+                // value is the entire row object, so access basic_salary from it
+                const salary = parseFloat(value.basic_salary) || 0;
+                return `₱ ${salary.toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                })}`;
+            }
         },
         {
             label: 'Salary Status',

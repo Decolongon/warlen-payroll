@@ -216,25 +216,6 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
         }, { preserveState: true, replace: true });
     };
 
-    const FilterEmptyState = () => (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="rounded-full bg-gray-100 p-6 mb-4">
-                <CalendarDays className="h-12 w-12 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">No leaves found</h3>
-            <p className="text-gray-500 mb-6 max-w-sm">
-                {searchTerm ? `No results match "${searchTerm}". Try adjusting your search.` :
-                    statusFilter ? `No ${statusFilter} leaves found.` :
-                        'No application leaves available at the moment.'}
-            </p>
-            {(searchTerm || statusFilter) && (
-                <Button variant="outline" onClick={handleClearAllFilters}>
-                    Clear Filters
-                </Button>
-            )}
-        </div>
-    );
-
     const StatusBadge = ({ status }: { status: string }) => {
         const statusLower = status?.toLowerCase() || 'pending';
         const styles: Record<string, string> = {
@@ -336,6 +317,8 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
                         onView={handleView}
                         onEdit={handleEdit}
                         onRestore={() => { }}
+                        hasActiveFilters={!!searchTerm || !!statusFilter}
+                        searchTerm={searchTerm}
                         toolbar={
                             <ApplicationLeaveFilterBar
                                 searchTerm={searchTerm}
@@ -351,19 +334,36 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
                                 }}
                             />
                         }
-                        filterEmptyState={<FilterEmptyState />}
-                        emptyState={leaves.length === 0 && !searchTerm && !statusFilter ? (
-                            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                                    <CalendarDays className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+                        filterEmptyState={
+                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                    <X className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                                 </div>
-                                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">No application leaves found</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm">There are no leave applications available at the moment.</p>
-                                <Link href={ApplicationLeaveController.create().url}>
-                                    <Button className="gap-2"><PlusCircle className="h-4 w-4" /> Create Leave Application</Button>
-                                </Link>
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                    {searchTerm || statusFilter
+                                        ? `No leave applications found matching "${searchTerm || statusFilter}"`
+                                        : "No leave applications found"}
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                    {searchTerm || statusFilter
+                                        ? "Try adjusting your search or filter criteria"
+                                        : "No leave applications have been submitted yet"}
+                                </p>
+                                <Button variant="outline" size="sm" onClick={handleClearAllFilters}>
+                                    Clear filters
+                                </Button>
                             </div>
-                        ) : null}
+                        }
+                        emptyState={
+                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                    <CalendarClock className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                </div>
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No application leave yet.</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                    There are no requested application leaves at the moment.
+                                </p>
+                            </div>}
                     />
                     {leaves.length > 0 && (
                         <CustomPagination

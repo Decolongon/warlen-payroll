@@ -1,6 +1,6 @@
 // pages/branches/index.tsx
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Building2, Search } from 'lucide-react';
+import { Building2, Plus, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import BranchController from "@/actions/App/Http/Controllers/BranchController";
 import { CustomHeader } from '@/components/custom-header';
@@ -216,14 +216,16 @@ export default function Index({ branches, filters, totalCount, filteredCount }: 
 						description='A list of all branches'
 					/>
 
-					<div className="flex items-center gap-2">
-						<Link
-							href={BranchController.create()}
-							className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap"
-						>
-							+ Add Branch
-						</Link>
-					</div>
+					{branches.total >= 1 && (
+						<div className="flex items-center gap-2">
+							<Link
+								href={BranchController.create()}
+								className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap"
+							>
+								<Plus /> Add Branch
+							</Link>
+						</div>
+					)}
 				</div>
 
 				<div className="pp-row">
@@ -253,22 +255,36 @@ export default function Index({ branches, filters, totalCount, filteredCount }: 
 							/>
 						}
 						filterEmptyState={
-							hasActiveFilters && branches.data.length === 0 ? (
-								<div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-									<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-										<Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-									</div>
-									<h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-										No results found
-									</h3>
-									<p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-										No branches matching "{data.search}".
-									</p>
-									<Button variant="outline" size="sm" onClick={handleClearAll}>
-										Clear search
-									</Button>
+							<div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+								<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+									<X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 								</div>
-							) : undefined
+								<h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+									No results found
+								</h3>
+								<p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+									No branches matching "{data.search}".
+								</p>
+								<Button variant="outline" size="sm" className="cursor-pointer" onClick={handleClearAll}>
+									Clear search
+								</Button>
+							</div>
+						}
+						emptyState={
+							<div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+								<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+									<Building2 className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+								</div>
+								<h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+									No branches yet.
+								</h3>
+								<p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+									Add a new branch to get started.
+								</p>
+								<Button variant="" size="sm" className="cursor-pointer" onClick={() => router.get(BranchController.create().url)}>
+									<Plus /> Add Branch
+								</Button>
+							</div>
 						}
 					/>
 
