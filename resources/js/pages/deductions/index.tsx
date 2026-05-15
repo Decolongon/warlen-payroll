@@ -1,7 +1,7 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
-import { Briefcase, HandCoins, Plus, X } from 'lucide-react';
+import { Briefcase, HandCoins, Plus, X, Search } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CardContent } from '@/components/ui/card';
@@ -123,6 +123,16 @@ export default function Index({
     const [currentPage, setCurrentPage] = useState(deductions.current_page || 1);
     const [itemsPerPage, setItemsPerPage] = useState(deductions.per_page || 10);
     const [isLoading, setIsLoading] = useState(false);
+    
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastDateFrom, setLastDateFrom] = useState<Date | undefined>(undefined);
+    const [lastDateTo, setLastDateTo] = useState<Date | undefined>(undefined);
 
     // Track last shown flash to prevent duplicates within a short time window
     const lastFlashRef = useRef<{ key: string; time: number }>({ key: '', time: 0 });
@@ -172,6 +182,9 @@ export default function Index({
         page?: number;
         perPage?: number;
     }) => {
+        // Don't apply filters while clearing
+        if (isClearingRef.current) return;
+        
         const params = new URLSearchParams();
 
         const search = updates.search !== undefined ? updates.search : searchTerm;
@@ -181,7 +194,6 @@ export default function Index({
         const perPage = updates.perPage !== undefined ? updates.perPage : itemsPerPage;
 
         if (search) params.append('search', search);
-        // ✅ FIX: use formatLocalDate instead of toISOString()
         if (from) params.append('date_from', formatLocalDate(from));
         if (to) params.append('date_to', formatLocalDate(to));
         params.append('page', String(page));
@@ -251,24 +263,56 @@ export default function Index({
     };
 
     const handleSearch = (value: string) => {
+        if (isClearingRef.current) return;
         setSearchTerm(value);
     };
 
     const handleDateFromChange = (date: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateFrom(date);
     };
 
     const handleDateToChange = (date: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateTo(date);
     };
 
     const clearFilters = () => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastDateFrom(dateFrom);
+        setLastDateTo(dateTo);
+        
+        // Clear any pending timers
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
         setSearchTerm('');
         setDateFrom(undefined);
         setDateTo(undefined);
+        
+        // Navigate with cleared filters
         router.visit('/deductions', {
             preserveState: true,
             preserveScroll: true,
+            onFinish: () => {
+                clearFiltersTimer.current = setTimeout(() => {
+                    isClearingRef.current = false;
+                    setIsClearingFilters(false);
+                    // Clear stored filters after a delay
+                    setTimeout(() => {
+                        setLastSearchTerm('');
+                        setLastDateFrom(undefined);
+                        setLastDateTo(undefined);
+                    });
+                });
+            }
         });
     };
 
@@ -296,10 +340,31 @@ export default function Index({
     const handleView = (deduction: Deduction) => setSelected(deduction);
 
     const hasFilters = !!(searchTerm || dateFrom || dateTo);
+    const showFilterEmptyState = hasFilters || isClearingFilters || (lastSearchTerm && lastSearchTerm.trim() !== '');
     const currentData = deductions.data || [];
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No deductions matching "${lastSearchTerm}".`;
+        }
+        if (isClearingFilters && (lastDateFrom || lastDateTo)) {
+            return `No deductions in the selected date range.`;
+        }
+        if (searchTerm && (dateFrom || dateTo)) {
+            return `No deductions matching "${searchTerm}" in the selected date range.`;
+        }
+        if (searchTerm) {
+            return `No deductions matching "${searchTerm}".`;
+        }
+        if (dateFrom || dateTo) {
+            return `No deductions in the selected date range.`;
+        }
+        return 'No deductions match your current filters.';
+    };
 
     const getEmployeeName = useCallback((emp: any) =>
         emp.user?.name || 'Unnamed Employee', []);
@@ -433,7 +498,6 @@ export default function Index({
                     )}
                 </div>
 
-
                 <CardContent className="p-0 pp-row">
                     <CustomTable
                         columns={columns}
@@ -472,30 +536,41 @@ export default function Index({
                             />
                         }
                         emptyState={
-                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                    <HandCoins className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                            showFilterEmptyState ? (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                        No results found
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        {getFilterDisplayText()}
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                        onClick={clearFilters}
+                                        disabled={isClearingFilters}
+                                    >
+                                        {isClearingFilters ? 'Clearing filters...' : 'Clear filters'}
+                                    </Button>
                                 </div>
-                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No deduction yet.</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                    Start by adding your first employee deduction to manage payroll adjustments.
-                                </p>
-                                <Button onClick={() => router.get(DeductionController.create())} className="bg-[#1d4791] hover:bg-[#1d4791]/90 cursor-pointer">
-                                    <Plus />Add Deduction
-                                </Button>
-                            </div>
-                        }
-                        filterEmptyState={
-                           <div className="flex flex-col items-center justify-center py-16">
-								<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-									<X className="h-5 w-5 text-muted-foreground" />
-								</div>
-								<h3 className="text-sm font-semibold mb-2">No results found</h3>
-								<p className="text-xs text-muted-foreground mb-4">
-									No deductions match "{searchTerm}"
-								</p>
-								<Button variant="outline" className="cursor-pointer" onClick={clearFilters}>Clear all filters</Button>
-							</div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <HandCoins className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No deduction yet.</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        Get started by creating your first deduction.
+                                    </p>
+                                    <Button onClick={() => router.get(DeductionController.create())} className="bg-[#1d4791] hover:bg-[#1d4791]/90 cursor-pointer">
+                                        <Plus className="h-4 w-4 mr-2" /> Add Deduction
+                                    </Button>
+                                </div>
+                            )
                         }
                     />
 

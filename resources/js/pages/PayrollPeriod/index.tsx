@@ -2,7 +2,7 @@ import { Head, Link, usePage, router } from '@inertiajs/react';
 import {
     CalendarDays, Plus, Clock, CheckCircle2,
     AlertCircle, Filter, Pencil, Trash2, Eye, Calendar, XCircle, Loader2,
-    BadgeCheck, Search
+    BadgeCheck, X, Search
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import PayrollPeriodController from '@/actions/App/Http/Controllers/PayrollPeriodController';
@@ -18,7 +18,6 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { roundToNearestHours } from 'date-fns';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface PayrollPeriod {
@@ -170,8 +169,17 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
         localStorage.getItem('payrollPeriods-statusFilter') || 'all'
     );
     
-    // Add search state
+    // Search state
     const [searchTerm, setSearchTerm] = useState<string>('');
+
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastStatusFilter, setLastStatusFilter] = useState('');
 
     // Simplified processing state
     const [processingPeriodId, setProcessingPeriodId] = useState<number | null>(null);
@@ -389,11 +397,81 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
 
     // Handle search
     const handleSearchChange = (value: string) => {
+        if (isClearingRef.current) return;
         setSearchTerm(value);
     };
 
-    const handleSearchReset = () => {
+    const handleStatusFilterChange = (value: string) => {
+        if (isClearingRef.current) return;
+        setStatusFilter(value);
+    };
+
+    const clearAllFilters = () => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastStatusFilter(statusFilter);
+        
+        // Clear any pending timers
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
+        setStatusFilter('all');
         setSearchTerm('');
+        
+        // Navigate with cleared filters
+        router.get('/payroll-periods', {}, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            onFinish: () => {
+                clearFiltersTimer.current = setTimeout(() => {
+                    isClearingRef.current = false;
+                    setIsClearingFilters(false);
+                    // Clear stored filters after a delay
+                    setTimeout(() => {
+                        setLastSearchTerm('');
+                        setLastStatusFilter('');
+                    });
+                });
+            }
+        });
+    };
+
+    // Determine which empty state to show
+    const hasActiveFilters = statusFilter !== 'all' || !!searchTerm;
+    const showFilterEmptyState = hasActiveFilters || isClearingFilters || (lastSearchTerm && lastSearchTerm.trim() !== '') || (lastStatusFilter && lastStatusFilter !== 'all');
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm && lastStatusFilter !== 'all') {
+            const statusLabel = formatStatus(lastStatusFilter);
+            return `No payroll periods matching "${lastSearchTerm}" with status "${statusLabel}".`;
+        }
+        if (isClearingFilters && lastSearchTerm) {
+            return `No payroll periods matching "${lastSearchTerm}".`;
+        }
+        if (isClearingFilters && lastStatusFilter !== 'all') {
+            const statusLabel = formatStatus(lastStatusFilter);
+            return `No payroll periods with status "${statusLabel}".`;
+        }
+        if (searchTerm && statusFilter !== 'all') {
+            const statusLabel = formatStatus(statusFilter);
+            return `No payroll periods matching "${searchTerm}" with status "${statusLabel}".`;
+        }
+        if (searchTerm) {
+            return `No payroll periods matching "${searchTerm}".`;
+        }
+        if (statusFilter !== 'all') {
+            const statusLabel = formatStatus(statusFilter);
+            return `No payroll periods with status "${statusLabel}".`;
+        }
+        return 'No payroll periods match your current filters.';
     };
 
     // Toolbar slot for the filter controls with search
@@ -425,7 +503,7 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
             
             <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={handleStatusFilterChange} disabled={isClearingFilters}>
                     <SelectTrigger className="h-9 w-[180px] rounded-xl border-2 text-sm focus:border-primary">
                         <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
@@ -436,15 +514,13 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                         ))}
                     </SelectContent>
                 </Select>
-                {(statusFilter !== 'all' || searchTerm) && (
+                {hasActiveFilters && (
                     <button
-                        onClick={() => {
-                            setStatusFilter('all');
-                            setSearchTerm('');
-                        }}
-                        className="rounded-xl border-2 border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-accent hover:text-accent active:scale-95"
+                        onClick={clearAllFilters}
+                        disabled={isClearingFilters}
+                        className="rounded-xl border-2 border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-accent hover:text-accent active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Clear All
+                        {isClearingFilters ? 'Clearing...' : 'Clear All'}
                     </button>
                 )}
             </div>
@@ -505,8 +581,10 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                                 count={counts.all}
                                 active={statusFilter === 'all' && !searchTerm}
                                 onClick={() => {
-                                    setStatusFilter('all');
-                                    setSearchTerm('');
+                                    if (!isClearingFilters) {
+                                        setStatusFilter('all');
+                                        setSearchTerm('');
+                                    }
                                 }}
                                 color="muted"
                             />
@@ -517,8 +595,10 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                                     count={counts[value] || 0}
                                     active={statusFilter === value && !searchTerm}
                                     onClick={() => {
-                                        setStatusFilter(value);
-                                        setSearchTerm('');
+                                        if (!isClearingFilters) {
+                                            setStatusFilter(value);
+                                            setSearchTerm('');
+                                        }
                                     }}
                                     color={getStatusColor(value)}
                                 />
@@ -538,44 +618,38 @@ export default function Index({ payrollPeriods }: PayrollPeriodProps) {
                             onRunPayroll={handleRunPayroll}
                             toolbar={toolbar}
                             searchTerm={searchTerm}
-                            hasActiveFilters={statusFilter !== 'all' || !!searchTerm}
-                            filterEmptyState={
-                                <div className="flex flex-col items-center justify-center rounded-2xl py-16 text-center">
-                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                                        <Search className="h-6 w-6 text-primary/50" />
-                                    </div>
-                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                        No results found
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                        {searchTerm && statusFilter !== 'all' 
-                                            ? `No payroll periods matching "${searchTerm}" with status "${formatStatus(statusFilter)}".`
-                                            : searchTerm 
-                                                ? `No payroll periods matching "${searchTerm}".`
-                                                : `No payroll periods with status "${formatStatus(statusFilter)}".`
-                                        }
-                                    </p>
-                                    <button
-                                        onClick={() => {
-                                            setStatusFilter('all');
-                                            setSearchTerm('');
-                                        }}
-                                        className="mt-4 rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
-                                    >
-                                        Clear Filters
-                                    </button>
-                                </div>
-                            }
+                            hasActiveFilters={hasActiveFilters}
                             emptyState={
-                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                        <Calendar className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                showFilterEmptyState ? (
+                                    <div className="flex flex-col items-center justify-center rounded-2xl py-16 text-center">
+                                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                                            <Search className="h-6 w-6 text-primary/50" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                            No results found
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                            {getFilterDisplayText()}
+                                        </p>
+                                        <button
+                                            onClick={clearAllFilters}
+                                            disabled={isClearingFilters}
+                                            className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isClearingFilters ? 'Clearing filters...' : 'Clear filters'}
+                                        </button>
                                     </div>
-                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No payroll periods yet.</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                        Please import your attendance to automatically create payroll periods.
-                                    </p>
-                                </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                            <Calendar className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No payroll periods yet.</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                            Please import your attendance to automatically create payroll periods.
+                                        </p>
+                                    </div>
+                                )
                             }
                         />
                     </div>

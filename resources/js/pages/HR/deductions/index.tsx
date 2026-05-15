@@ -1,7 +1,7 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/hr-layout';
 import { Button } from '@/components/ui/button';
-import { Briefcase, HandCoins, Plus, Search } from 'lucide-react';
+import { Briefcase, HandCoins, Plus, X, Search } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CardContent } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { CustomPagination } from '@/components/custom-pagination';
 import type { BreadcrumbItem } from '@/types';
 import { CustomHeader } from '@/components/custom-header';
 import { DeleteConfirmationDialog } from '@/components/delete-confirmation-modal';
-import DeductionController from '@/actions/App/Http/Controllers/HrRole/HRDeductionController';
+import HRDeductionController from '@/actions/App/Http/Controllers/HrRole/HRDeductionController';
 import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Deductions', href: '/hr/deductions' }];
@@ -123,6 +123,16 @@ export default function Index({
     const [currentPage, setCurrentPage] = useState(deductions.current_page || 1);
     const [itemsPerPage, setItemsPerPage] = useState(deductions.per_page || 10);
     const [isLoading, setIsLoading] = useState(false);
+    
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastDateFrom, setLastDateFrom] = useState<Date | undefined>(undefined);
+    const [lastDateTo, setLastDateTo] = useState<Date | undefined>(undefined);
 
     // Track last shown flash to prevent duplicates within a short time window
     const lastFlashRef = useRef<{ key: string; time: number }>({ key: '', time: 0 });
@@ -172,6 +182,9 @@ export default function Index({
         page?: number;
         perPage?: number;
     }) => {
+        // Don't apply filters while clearing
+        if (isClearingRef.current) return;
+        
         const params = new URLSearchParams();
 
         const search = updates.search !== undefined ? updates.search : searchTerm;
@@ -181,7 +194,6 @@ export default function Index({
         const perPage = updates.perPage !== undefined ? updates.perPage : itemsPerPage;
 
         if (search) params.append('search', search);
-        // ✅ FIX: use formatLocalDate instead of toISOString()
         if (from) params.append('date_from', formatLocalDate(from));
         if (to) params.append('date_to', formatLocalDate(to));
         params.append('page', String(page));
@@ -251,24 +263,56 @@ export default function Index({
     };
 
     const handleSearch = (value: string) => {
+        if (isClearingRef.current) return;
         setSearchTerm(value);
     };
 
     const handleDateFromChange = (date: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateFrom(date);
     };
 
     const handleDateToChange = (date: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateTo(date);
     };
 
     const clearFilters = () => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastDateFrom(dateFrom);
+        setLastDateTo(dateTo);
+        
+        // Clear any pending timers
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
         setSearchTerm('');
         setDateFrom(undefined);
         setDateTo(undefined);
+        
+        // Navigate with cleared filters
         router.visit('/hr/deductions', {
             preserveState: true,
             preserveScroll: true,
+            onFinish: () => {
+                clearFiltersTimer.current = setTimeout(() => {
+                    isClearingRef.current = false;
+                    setIsClearingFilters(false);
+                    // Clear stored filters after a delay
+                    setTimeout(() => {
+                        setLastSearchTerm('');
+                        setLastDateFrom(undefined);
+                        setLastDateTo(undefined);
+                    });
+                });
+            }
         });
     };
 
@@ -296,10 +340,31 @@ export default function Index({
     const handleView = (deduction: Deduction) => setSelected(deduction);
 
     const hasFilters = !!(searchTerm || dateFrom || dateTo);
+    const showFilterEmptyState = hasFilters || isClearingFilters || (lastSearchTerm && lastSearchTerm.trim() !== '');
     const currentData = deductions.data || [];
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No deductions matching "${lastSearchTerm}".`;
+        }
+        if (isClearingFilters && (lastDateFrom || lastDateTo)) {
+            return `No deductions in the selected date range.`;
+        }
+        if (searchTerm && (dateFrom || dateTo)) {
+            return `No deductions matching "${searchTerm}" in the selected date range.`;
+        }
+        if (searchTerm) {
+            return `No deductions matching "${searchTerm}".`;
+        }
+        if (dateFrom || dateTo) {
+            return `No deductions in the selected date range.`;
+        }
+        return 'No deductions match your current filters.';
+    };
 
     const getEmployeeName = useCallback((emp: any) =>
         emp.user?.name || 'Unnamed Employee', []);
@@ -358,7 +423,7 @@ export default function Index({
             if (dateTo) params.append('date_to', formatLocalDate(dateTo));
             params.append('page', String(page));
             params.append('per_page', String(itemsPerPage));
-            return `/hr/deductions?${params.toString()}`;
+            return `/deductions?${params.toString()}`;
         };
 
         links.push({
@@ -403,7 +468,7 @@ export default function Index({
     }, [currentPage, deductions.total, itemsPerPage, searchTerm, dateFrom, dateTo]);
 
     const handleEdit = (deduction: Deduction) => {
-        router.get(DeductionController.edit(deduction.id).url);
+        router.get(HRDeductionController.edit(deduction.id).url);
     };
 
     return (
@@ -426,9 +491,11 @@ export default function Index({
             <div className="flex flex-1 flex-col gap-4 p-4 mx-4">
                 <div className="flex justify-between items-center pp-header">
                     <CustomHeader title="Deductions" icon={<HandCoins className="h-6 w-6" />} description='Manage and track employee deductions' />
-                    <Link href={DeductionController.create()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap">
-                        <Plus className="h-4 w-4 mr-2" /> Add Deduction
-                    </Link>
+                    {deductions.total >= 1 && (
+                        <Link href={HRDeductionController.create()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap">
+                            <Plus className="h-4 w-4 mr-2" /> Add Deduction
+                        </Link>
+                    )}
                 </div>
 
                 <CardContent className="p-0 pp-row">
@@ -442,6 +509,8 @@ export default function Index({
                         onEdit={handleEdit}
                         title="Deductions List"
                         isLoading={isLoading}
+                        hasActiveFilters={hasFilters}
+                        searchTerm={searchTerm}
                         toolbar={
                             <EmployeeFilterBar
                                 filters={{ search: true, position: false, branch: false, site: false, date: true, status: false }}
@@ -467,23 +536,41 @@ export default function Index({
                             />
                         }
                         emptyState={
-                            deductions.total === 0 && !hasFilters ? (
-                                <div className="flex flex-col items-center justify-center py-16">
-                                    <div className="rounded-full bg-primary/10 p-6 mb-4"><HandCoins className="h-12 w-12 text-primary" /></div>
-                                    <h3 className="text-xl font-semibold mb-2">No deductions yet</h3>
-                                    <p className="text-muted-foreground mb-4">Create your first deduction to get started</p>
-                                    <Link href={DeductionController.create()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap">Create First Deduction</Link>
-                                </div>
-                            ) : currentData.length === 0 && hasFilters ? (
-                                <div className="flex flex-col items-center justify-center py-16">
-                                    <div className="rounded-full bg-muted p-6 mb-4"><Search className="h-12 w-12 text-muted-foreground" /></div>
-                                    <h3 className="text-xl font-semibold mb-2">No results found</h3>
-                                    <p className="text-muted-foreground mb-4">
-                                        No deductions match "{searchTerm}" {dateFrom || dateTo ? 'in the selected date range' : ''}
+                            showFilterEmptyState ? (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                        No results found
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        {getFilterDisplayText()}
                                     </p>
-                                    <Button variant="outline" onClick={clearFilters}>Clear all filters</Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                        onClick={clearFilters}
+                                        disabled={isClearingFilters}
+                                    >
+                                        {isClearingFilters ? 'Clearing filters...' : 'Clear filters'}
+                                    </Button>
                                 </div>
-                            ) : null
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <HandCoins className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No deduction yet.</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        Get started by creating your first deduction.
+                                    </p>
+                                    <Button onClick={() => router.get(HRDeductionController.create())} className="bg-[#1d4791] hover:bg-[#1d4791]/90 cursor-pointer">
+                                        <Plus className="h-4 w-4 mr-2" /> Add Deduction
+                                    </Button>
+                                </div>
+                            )
                         }
                     />
 

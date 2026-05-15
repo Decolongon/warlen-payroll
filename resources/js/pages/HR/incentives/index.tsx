@@ -1,6 +1,6 @@
 // pages/incentives/index.tsx
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Briefcase, Coins, Eye, Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Briefcase, Coins, Eye, Plus, X, Pencil, Trash2, Search } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CustomHeader } from '@/components/custom-header';
 import { CustomTable } from '@/components/custom-table';
@@ -16,7 +16,7 @@ import { CustomPagination } from '@/components/custom-pagination';
 import { IncentivesTableConfig } from '@/config/tables/incentives-table';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { formatDateSimple } from '@/utils/formatDateSimple';
-import IncentiveController from '@/actions/App/Http/Controllers/HrRole/HRIncentiveController';
+import HRIncentiveController from '@/actions/App/Http/Controllers/HrRole/HRIncentiveController';
 import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Incentives', href: '/hr/incentives' }];
@@ -116,6 +116,16 @@ export default function Index({ incentives, payroll_periods, employees, filters 
     const [isDeleting, setIsDeleting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastDateFrom, setLastDateFrom] = useState<Date | undefined>(undefined);
+    const [lastDateTo, setLastDateTo] = useState<Date | undefined>(undefined);
+
     // Local state for filters – now using parseLocalDate to avoid UTC shift
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
     const [dateFrom, setDateFrom] = useState<Date | undefined>(
@@ -175,6 +185,9 @@ export default function Index({ incentives, payroll_periods, employees, filters 
         page?: number;
         perPage?: number;
     }) => {
+        // Don't apply filters while clearing
+        if (isClearingRef.current) return;
+        
         const params = new URLSearchParams();
 
         const search = updates.search !== undefined ? updates.search : searchTerm;
@@ -184,7 +197,6 @@ export default function Index({ incentives, payroll_periods, employees, filters 
         const perPage = updates.perPage !== undefined ? updates.perPage : itemsPerPage;
 
         if (search) params.append('search', search);
-        // ✅ FIX: use formatLocalDate instead of toISOString()
         if (from) params.append('date_from', formatLocalDate(from));
         if (to) params.append('date_to', formatLocalDate(to));
         params.append('page', String(page));
@@ -254,35 +266,67 @@ export default function Index({ incentives, payroll_periods, employees, filters 
     };
 
     const handleSearchChange = (value: string) => {
+        if (isClearingRef.current) return;
         setSearchTerm(value);
     };
 
     const handleDateFromChange = (date: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateFrom(date);
     };
 
     const handleDateToChange = (date: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateTo(date);
     };
 
     const clearFilters = () => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastDateFrom(dateFrom);
+        setLastDateTo(dateTo);
+        
+        // Clear any pending timers
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
         setSearchTerm('');
         setDateFrom(undefined);
         setDateTo(undefined);
+        
+        // Navigate with cleared filters
         router.visit('/hr/incentives', {
             preserveState: true,
             preserveScroll: true,
+            onFinish: () => {
+                clearFiltersTimer.current = setTimeout(() => {
+                    isClearingRef.current = false;
+                    setIsClearingFilters(false);
+                    // Clear stored filters after a delay
+                    setTimeout(() => {
+                        setLastSearchTerm('');
+                        setLastDateFrom(undefined);
+                        setLastDateTo(undefined);
+                    });
+                });
+            }
         });
     };
 
     // Direct navigation to create page
     const handleCreate = () => {
-        router.visit(IncentiveController.create());
+        router.visit(HRIncentiveController.create());
     };
 
     // Direct navigation to edit page
     const handleEdit = (incentive: Incentive) => {
-        router.visit(IncentiveController.edit(incentive.id).url);
+        router.visit(HRIncentiveController.edit(incentive.id).url);
     };
 
     // Handle delete
@@ -294,7 +338,7 @@ export default function Index({ incentives, payroll_periods, employees, filters 
     const confirmDelete = () => {
         if (!itemToDelete) return;
         setIsDeleting(true);
-        destroy(IncentiveController.destroy(itemToDelete.id).url, {
+        destroy(HRIncentiveController.destroy(itemToDelete.id).url, {
             onSuccess: () => {
                 setDeleteDialogOpen(false);
                 setItemToDelete(null);
@@ -311,7 +355,28 @@ export default function Index({ incentives, payroll_periods, employees, filters 
     const handleView = (incentive: Incentive) => setSelected(incentive);
 
     const hasFilters = !!(searchTerm || dateFrom || dateTo);
+    const showFilterEmptyState = hasFilters || isClearingFilters || (lastSearchTerm && lastSearchTerm.trim() !== '');
     const currentData = incentives.data || [];
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No incentives matching "${lastSearchTerm}".`;
+        }
+        if (isClearingFilters && (lastDateFrom || lastDateTo)) {
+            return `No incentives in the selected date range.`;
+        }
+        if (searchTerm && (dateFrom || dateTo)) {
+            return `No incentives matching "${searchTerm}" in the selected date range.`;
+        }
+        if (searchTerm) {
+            return `No incentives matching "${searchTerm}".`;
+        }
+        if (dateFrom || dateTo) {
+            return `No incentives in the selected date range.`;
+        }
+        return 'No incentives match your current filters.';
+    };
 
     // Generate pagination links – also uses local date formatting
     const paginationLinks = useMemo(() => {
@@ -325,7 +390,7 @@ export default function Index({ incentives, payroll_periods, employees, filters 
             if (dateTo) params.append('date_to', formatLocalDate(dateTo));
             params.append('page', String(page));
             params.append('per_page', String(itemsPerPage));
-            return `/hr/incentives?${params.toString()}`;
+            return `/incentives?${params.toString()}`;
         };
 
         // Previous button
@@ -397,9 +462,11 @@ export default function Index({ incentives, payroll_periods, employees, filters 
                         icon={<Coins className="h-6 w-6" />}
                         description="Manage employee incentives across payroll periods"
                     />
-                    <Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90">
-                        <Plus className="h-4 w-4 mr-2" /> Add Incentive
-                    </Button>
+                    {incentives.total >= 1 && (
+                        <Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90">
+                            <Plus className="h-4 w-4 mr-2" /> Add Incentive
+                        </Button>
+                    )}
                 </div>
 
                 {/* Table Section */}
@@ -414,6 +481,8 @@ export default function Index({ incentives, payroll_periods, employees, filters 
                         onDelete={handleDeleteClick}
                         title="Incentive Lists"
                         isLoading={isLoading}
+                        hasActiveFilters={hasFilters}
+                        searchTerm={searchTerm}
                         toolbar={
                             <EmployeeFilterBar
                                 filters={{ search: true, position: false, branch: false, site: false, date: true, status: false }}
@@ -439,29 +508,41 @@ export default function Index({ incentives, payroll_periods, employees, filters 
                             />
                         }
                         emptyState={
-                            incentives.total === 0 && !hasFilters ? (
-                                <div className="flex flex-col items-center justify-center py-16">
-                                    <div className="rounded-full bg-primary/10 p-6 mb-4">
-                                        <Briefcase className="h-12 w-12 text-primary" />
+                            showFilterEmptyState ? (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                                     </div>
-                                    <h3 className="text-xl font-semibold mb-2">No incentives yet</h3>
-                                    <p className="text-muted-foreground mb-4">Create your first incentive to get started</p>
-                                    <Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90">
-                                        Create First Incentive
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                        No results found
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        {getFilterDisplayText()}
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                        onClick={clearFilters}
+                                        disabled={isClearingFilters}
+                                    >
+                                        {isClearingFilters ? 'Clearing filters...' : 'Clear filters'}
                                     </Button>
                                 </div>
-                            ) : currentData.length === 0 && hasFilters ? (
-                                <div className="flex flex-col items-center justify-center py-16">
-                                    <div className="rounded-full bg-muted p-6 mb-4">
-                                        <Search className="h-12 w-12 text-muted-foreground" />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <Coins className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                                     </div>
-                                    <h3 className="text-xl font-semibold mb-2">No results found</h3>
-                                    <p className="text-muted-foreground mb-4">
-                                        No incentives match "{searchTerm}" {dateFrom || dateTo ? 'in the selected date range' : ''}
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No incentives found</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        Add incentive to start managing employee rewards and payroll bonuses.
                                     </p>
-                                    <Button variant="outline" onClick={clearFilters}>Clear all filters</Button>
+                                    <Button onClick={handleCreate} className="bg-[#1d4791] hover:bg-[#1d4791]/90 cursor-pointer">
+                                        <Plus className="h-4 w-4 mr-2" /> Add Incentive
+                                    </Button>
                                 </div>
-                            ) : null
+                            )
                         }
                     />
 

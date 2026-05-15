@@ -1,8 +1,8 @@
 import { Head, Link, useForm, usePage, router } from '@inertiajs/react';
 import Echo from 'laravel-echo';
-import { CalendarDays, PlusCircle, CalendarClock, X, Bell, Eye, Pencil, Trash2 } from 'lucide-react';
+import { CalendarDays, PlusCircle, CalendarClock, X, Bell, Eye, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
 import Pusher from 'pusher-js';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import ApplicationLeaveController from "@/actions/App/Http/Controllers/HrRole/HRApplicationLeaveController";
 import { CustomHeader } from '@/components/custom-header';
 import { CustomPagination } from '@/components/custom-pagination';
@@ -65,9 +65,25 @@ const formatDate = (dateString: string) => {
     });
 };
 
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
+}
+
 export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     const { delete: destroy } = useForm();
     const { applicationLeaveEnum } = usePage<PageProps>().props;
+
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastStatusFilter, setLastStatusFilter] = useState('');
 
     // State for real-time updates
     const [leaves, setLeaves] = useState(applicationLeaves);
@@ -80,7 +96,7 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
         return savedFilter || 'all';
     });
 
-      // Search state
+    // Search state
     const [searchTerm, setSearchTerm] = useState<string>("");
 
     // Dialog state for viewing details
@@ -96,13 +112,6 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
         channel.listen('.ApplicationLeaveEvent', (event: any) => {
             setNotification({
                 message: `New application leave created/updated`,
-                timestamp: new Date().toLocaleString()
-            });
-            setShowNotification(true);
-
-            // Show notification
-            setNotification({
-                message: `New application leave created`,
                 timestamp: new Date().toLocaleString()
             });
             setShowNotification(true);
@@ -146,6 +155,48 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
         localStorage.setItem('applicationLeaves-statusFilter', statusFilter);
     }, [statusFilter]);
 
+    // ── Filter handlers with clearing check ───────────────────────────────────
+    const handleStatusChange = (value: string) => {
+        if (isClearingRef.current) return;
+        setStatusFilter(value);
+    };
+
+    const handleSearchChange = (value: string) => {
+        if (isClearingRef.current) return;
+        setSearchTerm(value);
+    };
+
+    // ── Clear filters function with timeout ───────────────────────────────────
+    const clearFilters = () => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastStatusFilter(statusFilter);
+        
+        // Clear any pending timers
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
+        setSearchTerm('');
+        setStatusFilter('all');
+        
+        // Reset filters after timeout
+        clearFiltersTimer.current = setTimeout(() => {
+            isClearingRef.current = false;
+            setIsClearingFilters(false);
+            // Clear stored filters after a delay
+            setTimeout(() => {
+                setLastSearchTerm('');
+                setLastStatusFilter('');
+            }, 1000);
+        }, 500);
+    };
+
     // Handle delete
     const handleDelete = (slug_app: string) => {
         if (confirm("Are you sure you want to delete this application leave?")) {
@@ -163,6 +214,12 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     const handleView = (leave: any) => {
         setSelectedLeave(leave);
         setIsDialogOpen(true);
+    };
+
+    // Handle edit
+    const handleEdit = (row: any) => {
+        if (isClearingRef.current) return;
+        router.get(ApplicationLeaveController.edit(row.slug_app).url);
     };
 
     // Filter and search leaves
@@ -190,6 +247,34 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
 
         return result;
     }, [leaves, statusFilter, searchTerm]);
+
+    // ── Empty state logic ─────────────────────────────────────────────────────
+    const hasActiveFilters = !!(searchTerm || (statusFilter && statusFilter !== 'all'));
+    const showFilterEmptyState = hasActiveFilters || isClearingFilters || 
+                                (lastSearchTerm && lastSearchTerm.trim() !== '') || 
+                                (lastStatusFilter && lastStatusFilter !== 'all');
+
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No leave applications matching "${lastSearchTerm}".`;
+        }
+        if (isClearingFilters && lastStatusFilter && lastStatusFilter !== 'all') {
+            const statusLabel = applicationLeaveEnum?.find(s => s.value === lastStatusFilter)?.label || lastStatusFilter;
+            return `No leave applications with status "${statusLabel}".`;
+        }
+        if (searchTerm && statusFilter !== 'all') {
+            const statusLabel = applicationLeaveEnum?.find(s => s.value === statusFilter)?.label || statusFilter;
+            return `No leave applications matching "${searchTerm}" with status "${statusLabel}".`;
+        }
+        if (searchTerm) {
+            return `No leave applications matching "${searchTerm}".`;
+        }
+        if (statusFilter !== 'all') {
+            const statusLabel = applicationLeaveEnum?.find(s => s.value === statusFilter)?.label || statusFilter;
+            return `No leave applications with status "${statusLabel}".`;
+        }
+        return 'No leave applications match your current filters.';
+    };
 
     // Get status badge color
     const getStatusBadgeClass = (status: string) => {
@@ -262,31 +347,37 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
         { label: 'Delete', icon: 'Trash2', route: '', className: 'text-red-600' }
     ];
 
-    // Handle edit
-    const handleEdit = (row: any) => {
-        router.get(ApplicationLeaveController.edit(row.slug_app).url);
-    };
-
-    // Filter toolbar component
+    // ── Filter toolbar component with clear button ────────────────────────────
     const FilterToolbar = () => (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search */}
-            <div className="flex flex-col gap-2">
-                <Label htmlFor="search">Search</Label>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                    id="search"
                     placeholder="Search by employee name or code..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full h-10"
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-9 h-10 w-full rounded-xl border-2"
+                    disabled={isClearingFilters}
                 />
+                {searchTerm && !isClearingFilters && (
+                    <button
+                        onClick={() => handleSearchChange('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
             </div>
 
             {/* Status Filter */}
-            <div className="flex flex-col gap-2">
-                <Label htmlFor="status-filter">Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger id="status-filter" className="h-10">
+            <div className="w-[180px]">
+                <Select 
+                    value={statusFilter} 
+                    onValueChange={handleStatusChange}
+                    disabled={isClearingFilters}
+                >
+                    <SelectTrigger className="h-10 rounded-xl border-2">
                         <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -299,31 +390,50 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
                     </SelectContent>
                 </Select>
             </div>
+
+            {/* Clear All Button */}
+            {hasActiveFilters && (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearFilters}
+                    disabled={isClearingFilters}
+                    className="rounded-xl border-2"
+                >
+                    {isClearingFilters ? (
+                        <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Clearing...
+                        </>
+                    ) : (
+                        'Clear All'
+                    )}
+                </Button>
+            )}
         </div>
     );
 
-    // Empty state for filtered results
+    // ── Filter Empty State Component ──────────────────────────────────────────
     const FilterEmptyState = () => (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="rounded-full bg-gray-100 p-6 mb-4">
-                <CalendarDays className="h-12 w-12 text-gray-400" />
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No leaves found</h3>
-            <p className="text-gray-500 mb-6 max-w-sm">
-                {searchTerm
-                    ? `No results match "${searchTerm}". Try adjusting your search.`
-                    : statusFilter !== "all"
-                        ? `No ${statusFilter} leaves found.`
-                        : 'No application leaves available at the moment.'}
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                No results found
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                {getFilterDisplayText()}
             </p>
-            {(searchTerm || statusFilter !== "all") && (
-                <Button variant="outline" onClick={() => {
-                    setSearchTerm("");
-                    setStatusFilter("all");
-                }}>
-                    Clear Filters
-                </Button>
-            )}
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearFilters}
+                disabled={isClearingFilters}
+                className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold"
+            >
+                {isClearingFilters ? 'Clearing filters...' : 'Clear filters'}
+            </Button>
         </div>
     );
 
@@ -373,40 +483,39 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
                     </div>
                 )}
 
-                {/* Empty state for no leaves at all */}
-                    <div className='mx-4 pp-row'>
-                        <CustomTable
-                            title="Application Leave Lists"
-                            columns={columns}
-                            actions={actions}
-                            data={filteredLeaves}
-                            from={1}
-                            onDelete={(id) => handleDelete(id as string)}
-                            onView={handleView}
-                            onEdit={handleEdit}
-                            toolbar={<FilterToolbar />}
-                            filterEmptyState={<FilterEmptyState />}
-                            emptyState={
-                                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                                    <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                                        <CalendarDays className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+                {/* Table Section */}
+                <div className='mx-4 pp-row'>
+                    <CustomTable
+                        title="Application Leave Lists"
+                        columns={columns}
+                        actions={actions}
+                        data={filteredLeaves}
+                        from={1}
+                        onDelete={(id) => handleDelete(id as string)}
+                        onView={handleView}
+                        onEdit={handleEdit}
+                        toolbar={<FilterToolbar />}
+                        searchTerm={searchTerm}
+                        hasActiveFilters={hasActiveFilters}
+                        emptyState={
+                            showFilterEmptyState ? (
+                                <FilterEmptyState />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <CalendarDays className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                                     </div>
-                                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                                        No application leaves found
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                        No application leaves requested
                                     </h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm">
-                                        There are no leave applications available at the moment.
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        There are no leave applications requested at the moment.
                                     </p>
-                                    <Link href={ApplicationLeaveController.create().url}>
-                                        <Button className="gap-2">
-                                            <PlusCircle className="h-4 w-4" />
-                                            Create Leave Application
-                                        </Button>
-                                    </Link>
                                 </div>
-                            }
-                        />
-                    </div>
+                            )
+                        }
+                    />
+                </div>
             </div>
 
             {/* Leave Details Dialog */}

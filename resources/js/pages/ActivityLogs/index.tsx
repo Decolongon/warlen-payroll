@@ -374,17 +374,17 @@ export default function Index({
                         onDelete={() => { }}
                         onEdit={() => { }}
                         emptyState={
-                            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                                <div className="rounded-full bg-gray-100 dark:bg-gray-800 p-4 mb-4">
-                                    <Database className="h-12 w-12 text-gray-400 dark:text-gray-500" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                                    No activity logs available
-                                </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
-                                    There are no activity logs to display at the moment.
-                                </p>
-                            </div>
+                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+								<div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+									<Database className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+								</div>
+								<h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+									No activity logs available
+								</h3>
+								<p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+									There are no activity logs to display at the moment.
+								</p>
+							</div>
                         }
                         filterEmptyState={
                             <div className="flex flex-col items-center justify-center py-16">
@@ -395,7 +395,7 @@ export default function Index({
                                 <p className="text-xs text-muted-foreground mb-4">
                                     No activity logs matching "{searchTerm}" were found. Try adjusting your search or filters.
                                 </p>
-                                <Button variant="outline" onClick={clearFilters}>Clear all filters</Button>
+                                <Button className='cursor-pointer' variant="outline" onClick={clearFilters}>Clear all filters</Button>
                             </div>
                         }
                     />

@@ -1,6 +1,6 @@
 import { Head, Link, useForm, usePage, router } from '@inertiajs/react';
 import Echo from 'laravel-echo';
-import { CalendarDays, PlusCircle, Clipboard, X, Bell, CheckCircle2, XCircle, ShieldCheck, User, CalendarClock } from 'lucide-react';
+import { CalendarDays, PlusCircle, Clipboard, X, Bell, CheckCircle2, XCircle, ShieldCheck, User, CalendarClock, Search } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import ApplicationLeaveController from "@/actions/App/Http/Controllers/ApplicationLeaveController";
 import { CustomHeader } from '@/components/custom-header';
@@ -94,6 +94,15 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const searchTimeout = useRef<NodeJS.Timeout>();
 
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastStatusFilter, setLastStatusFilter] = useState('');
+
     const pagination = {
         links: applicationLeaves?.links || [],
         from: applicationLeaves?.from || 0,
@@ -157,6 +166,7 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     };
 
     const handleSearch = (value: string) => {
+        if (isClearingRef.current) return;
         setSearchTerm(value);
         setIsSearching(true);
 
@@ -178,6 +188,7 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     };
 
     const handleStatusChange = (value: string) => {
+        if (isClearingRef.current) return;
         setStatusFilter(value);
         router.get('/application-leave', {
             ...filters,
@@ -189,6 +200,7 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     };
 
     const handlePerPageChange = (value: string) => {
+        if (isClearingRef.current) return;
         router.get('/application-leave', {
             ...filters,
             search: searchTerm,
@@ -199,6 +211,7 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     };
 
     const handlePageChange = (page: number) => {
+        if (isClearingRef.current) return;
         router.get('/application-leave', {
             ...filters,
             search: searchTerm,
@@ -209,11 +222,41 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
     };
 
     const handleClearAllFilters = () => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastStatusFilter(statusFilter);
+        
+        // Clear any pending timers
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
         setSearchTerm("");
         setStatusFilter("");
+        
+        // Navigate with cleared filters
         router.get('/application-leave', {
             perPage: String(pagination.per_page)
-        }, { preserveState: true, replace: true });
+        }, { 
+            preserveState: true, 
+            replace: true,
+            onFinish: () => {
+                clearFiltersTimer.current = setTimeout(() => {
+                    isClearingRef.current = false;
+                    setIsClearingFilters(false);
+                    // Clear stored filters after a delay
+                    setTimeout(() => {
+                        setLastSearchTerm('');
+                        setLastStatusFilter('');
+                    });
+                });
+            }
+        });
     };
 
     const StatusBadge = ({ status }: { status: string }) => {
@@ -269,6 +312,33 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
         });
     };
 
+    // Determine which empty state to show
+    const hasActiveFilters = !!(searchTerm || statusFilter);
+    const showFilterEmptyState = hasActiveFilters || isClearingFilters || (lastSearchTerm && lastSearchTerm.trim() !== '') || (lastStatusFilter && lastStatusFilter !== '');
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No leave applications matching "${lastSearchTerm}".`;
+        }
+        if (isClearingFilters && lastStatusFilter) {
+            const statusLabel = applicationLeaveEnum.find(s => s.value === lastStatusFilter)?.label || lastStatusFilter;
+            return `No leave applications with status "${statusLabel}".`;
+        }
+        if (searchTerm && statusFilter) {
+            const statusLabel = applicationLeaveEnum.find(s => s.value === statusFilter)?.label || statusFilter;
+            return `No leave applications matching "${searchTerm}" with status "${statusLabel}".`;
+        }
+        if (searchTerm) {
+            return `No leave applications matching "${searchTerm}".`;
+        }
+        if (statusFilter) {
+            const statusLabel = applicationLeaveEnum.find(s => s.value === statusFilter)?.label || statusFilter;
+            return `No leave applications with status "${statusLabel}".`;
+        }
+        return 'No leave applications match your current filters.';
+    };
+
     // Convert applicationLeaveEnum to format expected by filter bar
     const statusOptions = [
         { value: '', label: 'All Statuses' },
@@ -317,7 +387,7 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
                         onView={handleView}
                         onEdit={handleEdit}
                         onRestore={() => { }}
-                        hasActiveFilters={!!searchTerm || !!statusFilter}
+                        hasActiveFilters={hasActiveFilters}
                         searchTerm={searchTerm}
                         toolbar={
                             <ApplicationLeaveFilterBar
@@ -334,36 +404,40 @@ export default function Index({ applicationLeaves }: ApplicationLeaveProps) {
                                 }}
                             />
                         }
-                        filterEmptyState={
-                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                    <X className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-                                </div>
-                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                    {searchTerm || statusFilter
-                                        ? `No leave applications found matching "${searchTerm || statusFilter}"`
-                                        : "No leave applications found"}
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                    {searchTerm || statusFilter
-                                        ? "Try adjusting your search or filter criteria"
-                                        : "No leave applications have been submitted yet"}
-                                </p>
-                                <Button variant="outline" size="sm" onClick={handleClearAllFilters}>
-                                    Clear filters
-                                </Button>
-                            </div>
-                        }
                         emptyState={
-                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                    <CalendarClock className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                            showFilterEmptyState ? (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                        No results found
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        {getFilterDisplayText()}
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                        onClick={handleClearAllFilters}
+                                        disabled={isClearingFilters}
+                                    >
+                                        {isClearingFilters ? 'Clearing filters...' : 'Clear filters'}
+                                    </Button>
                                 </div>
-                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No application leave yet.</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                    There are no requested application leaves at the moment.
-                                </p>
-                            </div>}
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                        <CalendarClock className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No application leave yet.</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                        No application leave has been requested yet.
+                                    </p>
+                                </div>
+                            )
+                        }
                     />
                     {leaves.length > 0 && (
                         <CustomPagination

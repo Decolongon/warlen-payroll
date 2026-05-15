@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { BreadcrumbItem } from '@/types';
-import { X, Bell, Search, Printer, Mail, Banknote } from 'lucide-react';
+import { X, Bell, Search, Printer, Mail, Banknote, Loader2 } from 'lucide-react';
 import PayrollProcessingCards from '@/components/payroll-processing-cards';
 import { CustomTable } from '@/components/custom-table';
 import { CustomPagination } from '@/components/custom-pagination';
@@ -121,6 +121,19 @@ export default function Index({
     const [selectedPrintPayrollId, setSelectedPrintPayrollId] = useState<number | null>(null);
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastPositions, setLastPositions] = useState<string[]>([]);
+    const [lastBranches, setLastBranches] = useState<string[]>([]);
+    const [lastSites, setLastSites] = useState<string[]>([]);
+    const [lastDateFrom, setLastDateFrom] = useState<Date | undefined>(undefined);
+    const [lastDateTo, setLastDateTo] = useState<Date | undefined>(undefined);
+
     // ── Bulk selection state ──────────────────────────────────────────────────
     const [selectedPayrollIds, setSelectedPayrollIds] = useState<(string | number)[]>([]);
 
@@ -232,6 +245,9 @@ export default function Index({
         perPage?: string;
         page?: number;
     } = {}) => {
+        // Don't apply filters while clearing
+        if (isClearingRef.current) return;
+        
         const params = buildParams(overrides);
         setIsFiltering(true);
         router.get('/payrolls', params, {
@@ -251,17 +267,20 @@ export default function Index({
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleSearchChange = useCallback((value: string) => {
+        if (isClearingRef.current) return;
         setSearchTerm(value);
         if (searchTimer.current) clearTimeout(searchTimer.current);
         searchTimer.current = setTimeout(() => applyFilters({ search: value, page: 1 }), 500);
     }, [applyFilters]);
 
     const handlePositionsChange = useCallback((positions: string[]) => {
+        if (isClearingRef.current) return;
         setSelectedPositions(positions);
         applyFilters({ positions, page: 1 });
     }, [applyFilters]);
 
     const handleBranchChange = useCallback((branch: string) => {
+        if (isClearingRef.current) return;
         const newBranches = branch ? [branch] : [];
         setSelectedBranches(newBranches);
         if (selectedSites.length) {
@@ -273,31 +292,60 @@ export default function Index({
     }, [applyFilters, selectedSites.length]);
 
     const handleSiteChange = useCallback((site: string) => {
+        if (isClearingRef.current) return;
         const newSites = site ? [site] : [];
         setSelectedSites(newSites);
         applyFilters({ sites: newSites, page: 1 });
     }, [applyFilters]);
 
     const handleDateFromChange = useCallback((from: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateFrom(from);
         applyFilters({ from: from && isValid(from) ? from : undefined, page: 1 });
     }, [applyFilters]);
 
     const handleDateToChange = useCallback((to: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateTo(to);
         applyFilters({ to: to && isValid(to) ? to : undefined, page: 1 });
     }, [applyFilters]);
 
     const handlePerPageChange = useCallback((value: string) => {
+        if (isClearingRef.current) return;
         setPerPage(value);
         applyFilters({ perPage: value, page: 1 });
     }, [applyFilters]);
 
     const handlePageChange = useCallback((page: number) => {
+        if (isClearingRef.current) return;
         applyFilters({ page });
     }, [applyFilters]);
 
     const clearFilters = useCallback(() => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastPositions([...selectedPositions]);
+        setLastBranches([...selectedBranches]);
+        setLastSites([...selectedSites]);
+        setLastDateFrom(dateFrom);
+        setLastDateTo(dateTo);
+        
+        // Clear any pending search timer
+        if (searchTimer.current) {
+            clearTimeout(searchTimer.current);
+            searchTimer.current = null;
+        }
+        
+        // Clear any existing clear filters timer
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
         setSearchTerm('');
         setSelectedPositions([]);
         setSelectedBranches([]);
@@ -305,12 +353,29 @@ export default function Index({
         setDateFrom(undefined);
         setDateTo(undefined);
         setPerPage('10');
+        
+        // Navigate with cleared filters
         router.get('/payrolls', { perPage: 10 }, {
             preserveState: false,
             preserveScroll: true,
             replace: true,
+            onFinish: () => {
+                clearFiltersTimer.current = setTimeout(() => {
+                    isClearingRef.current = false;
+                    setIsClearingFilters(false);
+                    // Clear stored filters after a delay
+                    setTimeout(() => {
+                        setLastSearchTerm('');
+                        setLastPositions([]);
+                        setLastBranches([]);
+                        setLastSites([]);
+                        setLastDateFrom(undefined);
+                        setLastDateTo(undefined);
+                    });
+                });
+            }
         });
-    }, []);
+    }, [searchTerm, selectedPositions, selectedBranches, selectedSites, dateFrom, dateTo]);
 
     // ── Loading state ─────────────────────────────────────────────────────────
     useEffect(() => {
@@ -372,6 +437,54 @@ export default function Index({
         const branchData = branchesData.find(b => b.branch_name === selectedBranches[0]);
         return branchData?.sites?.map(s => s.site_name) ?? [];
     }, [selectedBranches, branchesData]);
+
+    const hasActiveFilter = useMemo(() => {
+        return !!(
+            searchTerm?.trim() ||
+            selectedPositions.length > 0 ||
+            selectedBranches.length > 0 ||
+            selectedSites.length > 0 ||
+            dateFrom ||
+            dateTo
+        );
+    }, [searchTerm, selectedPositions, selectedBranches, selectedSites, dateFrom, dateTo]);
+
+    // Determine which empty state to show
+    const showFilterEmptyState = hasActiveFilter || isClearingFilters || (lastSearchTerm && lastSearchTerm.trim() !== '') || lastBranches.length > 0 || lastSites.length > 0 || lastPositions.length > 0;
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No payroll records matching "${lastSearchTerm}".`;
+        }
+        if (isClearingFilters && lastBranches.length > 0) {
+            const branchText = lastBranches.join(', ');
+            return `No payroll records for branch(es): ${branchText}.`;
+        }
+        if (isClearingFilters && lastPositions.length > 0) {
+            const positionText = lastPositions.join(', ');
+            return `No payroll records for position(s): ${positionText}.`;
+        }
+        if (isClearingFilters && (lastDateFrom || lastDateTo)) {
+            return `No payroll records in the selected date range.`;
+        }
+        if (searchTerm && (dateFrom || dateTo)) {
+            return `No payroll records matching "${searchTerm}" in the selected date range.`;
+        }
+        if (searchTerm) {
+            return `No payroll records matching "${searchTerm}".`;
+        }
+        if (dateFrom || dateTo) {
+            return `No payroll records in the selected date range.`;
+        }
+        if (selectedBranches.length > 0) {
+            return `No payroll records for branch(es): ${selectedBranches.join(', ')}.`;
+        }
+        if (selectedPositions.length > 0) {
+            return `No payroll records for position(s): ${selectedPositions.join(', ')}.`;
+        }
+        return 'No payroll records match your current filters.';
+    };
 
     const payrollTableData = useMemo(() => payrolls.map(p => ({
         id: p.id,
@@ -472,7 +585,6 @@ export default function Index({
         toast.loading(`Queuing ${ids.length} email(s)...`, { id: 'bulk-email' });
         axios.post('/payrolls/bulk-email', { ids })
             .then(() => {
-                // Backend returns 202 — emails are queued, not sent immediately
                 toast.success(
                     `${ids.length} payroll email(s) successfully. They will be sent shortly.`,
                     { id: 'bulk-email' }
@@ -486,7 +598,6 @@ export default function Index({
     }, []);
 
     const handlePrintSummary = useCallback(async () => {
-        // Build query params from current filters (no perPage/page limit)
         const params = new URLSearchParams();
         if (searchTerm.trim()) params.set('search', searchTerm.trim());
         if (selectedPositions.length) params.set('positions', selectedPositions.join(','));
@@ -508,7 +619,6 @@ export default function Index({
 
         toast.dismiss('print-summary');
 
-        // Map to summary shape (same as before, but uses allPayrolls instead of filteredPayrollTableData)
         const summaryPayrolls = allPayrolls.map(p => {
             const earnings = p.payroll_items
                 ?.filter(item => item.type === 'earning')
@@ -539,7 +649,6 @@ export default function Index({
             };
         });
 
-        // Aggregate totals (same logic as before)
         let totalGrossPay = 0, totalDeductions = 0, totalNetPay = 0;
         let totalOvertimePay = 0, totalOvertimeHours = 0, totalHolidayOvertimePay = 0;
         let totalIncentives = 0, totalContributions = 0, totalOtherDeductions = 0, totalLateDeduction = 0;
@@ -638,7 +747,6 @@ export default function Index({
                     </Button>
                 </>
             )}
-
         </>
     ), [selectedPayrollIds, handleBulkEmail, handlePrintSummary]);
 
@@ -734,32 +842,47 @@ export default function Index({
                             selectedIds={selectedPayrollIds}
                             onSelectChange={setSelectedPayrollIds}
                             selectAll={selectAll}
-                            emptyState={
-                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                        <Banknote className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-                                    </div>
-                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No payroll periods yet.</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                        Please complete the process to display the payrolls.
-                                    </p>
-                                </div>
-                            }
-                            filterEmptyState={
-                                <div className="flex flex-col items-center justify-center rounded-2xl py-16 text-center">
-                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                                        <Banknote className="h-6 w-6 text-primary/50" />
-                                    </div>
-                                    <p className="text-base font-semibold text-muted-foreground">No periods match this filter</p>
-                                    <button
-                                        onClick={clearFilters}
-                                        className="mt-4 rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
-                                    >
-                                        Clear Filters
-                                    </button>
-                                </div>
-                            }
+                            hasActiveFilters={hasActiveFilter}
+                            searchTerm={searchTerm}
                             isLoading={isFiltering && !isInitialLoad}
+                            emptyState={
+                                showFilterEmptyState ? (
+                                    <div className="flex flex-col items-center justify-center py-16">
+                                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                            <X className="h-5 w-5 text-muted-foreground" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold mb-2">No results found</h3>
+                                        <p className="text-xs text-muted-foreground mb-4">
+                                            {getFilterDisplayText()}
+                                        </p>
+                                        <Button 
+                                            variant="outline" 
+                                            className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer" 
+                                            onClick={clearFilters}
+                                            disabled={isClearingFilters}
+                                        >
+                                            {isClearingFilters ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    Clearing filters...
+                                                </>
+                                            ) : (
+                                                'Clear all filters'
+                                            )}
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                            <Banknote className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No payroll records yet.</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                            Please complete the process to display the payrolls.
+                                        </p>
+                                    </div>
+                                )
+                            }
                         />
                     )}
 

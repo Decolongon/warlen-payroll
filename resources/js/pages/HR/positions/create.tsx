@@ -76,7 +76,7 @@ export default function Create() {
                 {/* Header Section */}
                 <div className="mb-8">
                     <Link
-                        href="/positions"
+                        href="/hr/positions"
                         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 group"
                     >
                         <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
