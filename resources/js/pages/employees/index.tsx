@@ -1,10 +1,6 @@
 import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-<<<<<<< HEAD
 import { Users, Search, UserPlus, Archive, CircleUser, RotateCcw, Briefcase, Building2, Plus, X } from 'lucide-react';
-=======
-import { Users, Search, UserPlus, Archive, UsersRound, RotateCcw, Briefcase, Building2 } from 'lucide-react';
->>>>>>> 91360a15993c9d9665abaa9bd773b8975e392ff1
 import { useState, useRef, useMemo, useEffect } from 'react';
 import EmployeeController from '@/actions/App/Http/Controllers/EmployeeController';
 import { CustomHeader } from '@/components/custom-header';
