@@ -28,13 +28,14 @@ interface Employee {
     contract_start_date: string;
     contract_end_date: string;
     pay_frequency: 'weekender' | 'monthly' | 'semi_monthly';
-    employee_status: 'active' | 'inactive';
+    employee_status: 'active' | 'inactive' | 'newly_hired' | 'end_of_contract' | 'awol' | 'terminated' | 'resigned';
     created_at: string;
     updated_at: string;
     // Government IDs
     sss_number?: string;
     pagibig_number?: string;
     philhealth_number?: string;
+    tin_number?: string;
     // Relations
     position: { id: number; pos_name: string; deleted_at: string | null } | null;
     branch:   { id: number; branch_name: string; branch_address: string } | null;
@@ -50,7 +51,7 @@ interface Employee {
     mother_name?: string;
     father_name?: string;
     educ_attainment?: string;
-    certificate?: string;
+    certificate?: string[] | string | null;
     // Address
     permanent_address?: string;
     present_address?: string;
@@ -100,7 +101,7 @@ const computeDuration = (startStr?: string | null): string => {
     return `${years} yr${years !== 1 ? 's' : ''}, ${months} mo${months !== 1 ? 's' : ''}`;
 };
 
-const normaliseSkills = (raw?: string[] | string | null): string[] => {
+const normaliseArray = (raw?: string[] | string | null): string[] => {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw.filter(Boolean);
     try {
@@ -114,15 +115,29 @@ const normaliseSkills = (raw?: string[] | string | null): string[] => {
 /* ─────────────────────────────────────────────────────────────
    Micro-components
    ───────────────────────────────────────────────────────────── */
-function StatusBadge({ status }: { status: 'active' | 'inactive' }) {
-    const on = status === 'active';
+function StatusBadge({ status }: { status: string }) {
+    const statusKey = status?.toLowerCase() || 'newly_hired';
+    const isActive = statusKey === 'active';
     return (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-            on  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
-                : 'bg-orange-500/15  text-orange-300  border-orange-400/30'
+            isActive ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
+                : statusKey === 'newly_hired' ? 'bg-blue-500/15 text-blue-300 border-blue-400/30'
+                : statusKey === 'end_of_contract' ? 'bg-amber-500/15 text-amber-300 border-amber-400/30'
+                : 'bg-orange-500/15 text-orange-300 border-orange-400/30'
         }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-emerald-400' : 'bg-orange-400'}`} />
-            {on ? 'Active' : 'Inactive'}
+            <span className={`w-1.5 h-1.5 rounded-full ${
+                isActive ? 'bg-emerald-400' 
+                    : statusKey === 'newly_hired' ? 'bg-blue-400'
+                    : statusKey === 'end_of_contract' ? 'bg-amber-400'
+                    : 'bg-orange-400'
+            }`} />
+            {statusKey === 'active' ? 'Active' 
+                : statusKey === 'newly_hired' ? 'Newly Hired'
+                : statusKey === 'end_of_contract' ? 'End of Contract'
+                : statusKey === 'resigned' ? 'Resigned'
+                : statusKey === 'terminated' ? 'Terminated'
+                : statusKey === 'awol' ? 'AWOL'
+                : status || 'Inactive'}
         </span>
     );
 }
@@ -201,7 +216,7 @@ function InfoBlock({ label, value }: { label: string; value?: string | null }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SkillChips
+   Chip components
    ───────────────────────────────────────────────────────────── */
 function SkillChips({ skills }: { skills: string[] }) {
     if (skills.length === 0) {
@@ -211,7 +226,23 @@ function SkillChips({ skills }: { skills: string[] }) {
         <div className="flex flex-wrap gap-1.5">
             {skills.map((s, i) => (
                 <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#1d4791]/8 text-[#1d4791] border border-[#1d4791]/15">
+
                     {s}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+function CertificateChips({ certificates }: { certificates: string[] }) {
+    if (certificates.length === 0) {
+        return <span className="text-xs text-slate-300 italic">No certificates listed</span>;
+    }
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {certificates.map((cert, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    {cert}
                 </span>
             ))}
         </div>
@@ -242,7 +273,8 @@ export default function Show({ employee }: PageProps) {
         ? employee.avatar.startsWith('http') ? employee.avatar : `/storage/${employee.avatar}`
         : null;
     const employeeName = employee.user?.name || 'Employee';
-    const skills       = normaliseSkills(employee.skills);
+    const skills       = normaliseArray(employee.skills);
+    const certificates = normaliseArray(employee.certificate);
     const duration     = computeDuration(employee.contract_start_date);
 
     return (
@@ -260,67 +292,67 @@ export default function Show({ employee }: PageProps) {
             <div className="px-4 sm:px-6 lg:px-8 py-5 max-w-7xl mx-auto space-y-5">
 
                 <div
-					className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
-					style={{ animation: 'empFadeUp 0.4s ease both', animationDelay: '0ms' }}
-				>
-					{/* Back button – always left */}
-					<button
-						onClick={() => router.get('/employees')}
-						className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-[#1d4791] transition-colors group"
-					>
-						<ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
-						Back to list
-					</button>
+                    className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                    style={{ animation: 'empFadeUp 0.4s ease both', animationDelay: '0ms' }}
+                >
+                    {/* Back button – always left */}
+                    <button
+                        onClick={() => router.get('/employees')}
+                        className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-[#1d4791] transition-colors group"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                        Back to list
+                    </button>
 
-					{/* Action buttons – pushed to the right with ml-auto */}
-					<div className="flex items-center gap-2 ml-auto sm:ml-0">
-						<Link href={EmployeeController.edit(employee.slug_emp).url}>
-							<Button
-								variant="outline" size="sm"
-								className="gap-1.5 h-8 text-xs border-slate-200 text-slate-700 hover:bg-[#1d4791] hover:text-white hover:border-[#1d4791] transition-all"
-							>
-								<Edit className="h-3.5 w-3.5" /> Edit
-							</Button>
-						</Link>
+                    {/* Action buttons – pushed to the right with ml-auto */}
+                    <div className="flex items-center gap-2 ml-auto sm:ml-0">
+                        <Link href={EmployeeController.edit(employee.slug_emp).url}>
+                            <Button
+                                variant="outline" size="sm"
+                                className="gap-1.5 h-8 text-xs border-slate-200 text-slate-700 hover:bg-[#1d4791] hover:text-white hover:border-[#1d4791] transition-all"
+                            >
+                                <Edit className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                        </Link>
 
-						<Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-							<DialogTrigger asChild>
-								<Button
-									variant="outline" size="sm"
-									className="gap-1.5 h-8 text-xs border-[#d85e39]/30 text-[#d85e39] bg-[#d85e39]/5 hover:bg-[#d85e39] hover:text-white transition-all"
-								>
-									<Trash2 className="h-3.5 w-3.5" /> Delete
-								</Button>
-							</DialogTrigger>
-							<DialogContent className="rounded-xl shadow-xl">
-								<DialogHeader>
-									<DialogTitle className="text-slate-900">Confirm deletion</DialogTitle>
-									<DialogDescription className="text-slate-500">
-										Are you sure you want to delete{' '}
-										<span className="font-semibold text-slate-700">{employeeName}</span>?
-										This action cannot be undone.
-									</DialogDescription>
-								</DialogHeader>
-								<DialogFooter className="gap-2 sm:gap-0">
-									<Button
-										variant="outline"
-										onClick={() => setIsDeleteOpen(false)}
-										disabled={isDeleting}
-										className="border-slate-200"
-									>
-										Cancel
-									</Button>
-									<Button
-										onClick={handleDelete} disabled={isDeleting}
-										className="bg-[#d85e39] hover:bg-[#d85e39]/90 text-white shadow-sm shadow-[#d85e39]/20"
-									>
-										{isDeleting ? 'Deleting…' : 'Delete'}
-									</Button>
-								</DialogFooter>
-							</DialogContent>
-						</Dialog>
-					</div>
-				</div>
+                        <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="outline" size="sm"
+                                    className="gap-1.5 h-8 text-xs border-[#d85e39]/30 text-[#d85e39] bg-[#d85e39]/5 hover:bg-[#d85e39] hover:text-white transition-all"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="rounded-xl shadow-xl">
+                                <DialogHeader>
+                                    <DialogTitle className="text-slate-900">Confirm deletion</DialogTitle>
+                                    <DialogDescription className="text-slate-500">
+                                        Are you sure you want to delete{' '}
+                                        <span className="font-semibold text-slate-700">{employeeName}</span>?
+                                        This action cannot be undone.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter className="gap-2 sm:gap-0">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setIsDeleteOpen(false)}
+                                        disabled={isDeleting}
+                                        className="border-slate-200"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        onClick={handleDelete} disabled={isDeleting}
+                                        className="bg-[#d85e39] hover:bg-[#d85e39]/90 text-white shadow-sm shadow-[#d85e39]/20"
+                                    >
+                                        {isDeleting ? 'Deleting…' : 'Delete'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                </div>
 
                 {/* ══ 2. PROFILE HERO (standalone, no outer card) ═══════════ */}
                 <div
@@ -444,18 +476,14 @@ export default function Show({ employee }: PageProps) {
                             <Award className="h-3.5 w-3.5 text-white/75" />
                             <h3 className="text-[10px] font-bold tracking-widest uppercase text-white">Skills &amp; Qualifications</h3>
                         </div>
-                        <div className="p-4 flex-1">
-                            <div className="space-y-3">
-                                <div>
-                                    <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Skills</p>
-                                    <SkillChips skills={skills} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Certificate</p>
-                                    <p className={`text-xs font-medium ${employee.certificate ? 'text-slate-800' : 'text-slate-300 italic'}`}>
-                                        {employee.certificate || '—'}
-                                    </p>
-                                </div>
+                        <div className="p-4 flex-1 space-y-4">
+                            <div>
+                                <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Skills</p>
+                                <SkillChips skills={skills} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Certificates</p>
+                                <CertificateChips certificates={certificates} />
                             </div>
                         </div>
                     </div>
@@ -513,6 +541,7 @@ export default function Show({ employee }: PageProps) {
                         <InfoRow label="SSS Number"     value={employee.sss_number} />
                         <InfoRow label="Pag-IBIG MID"   value={employee.pagibig_number} />
                         <InfoRow label="PhilHealth PIN"  value={employee.philhealth_number} />
+                        <InfoRow label="TIN Number"      value={employee.tin_number} />
                     </Section>
 
                     {/* Work Location */}
