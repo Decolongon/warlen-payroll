@@ -117,12 +117,6 @@ trait EmployeeValidationRules
                 'regex:/^[a-zA-Z\s\'\-]+$/',
             ],
 
-            'certificate' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
             'permanent_address' => [
                 'nullable',
                 'string',
@@ -133,6 +127,18 @@ trait EmployeeValidationRules
                 'nullable',
                 'string',
                 'max:255',
+            ],
+
+            'certificate' => [
+                'nullable',
+                'array',
+                'max:20',   // max 20 certificate entries
+            ],
+
+            'certificate.*' => [
+                'string',
+                'max:30',
+                'distinct',
             ],
 
             'skills' => [
@@ -297,6 +303,11 @@ trait EmployeeValidationRules
             'permanent_address.max' => 'Permanent address cannot exceed 500 characters.',
             'present_address.max'   => 'Present address cannot exceed 500 characters.',
 
+            'certificate.array'    => 'Certificates must be provided as a list.',
+            'certificate.max'      => 'You cannot add more than 20 certificates.',
+            'certificate.*.string' => 'Each certificate must be valid text.',
+            'certificate.*.max'    => 'Each certificate cannot exceed 50 characters.',
+            'certificate.*.distinct' => 'Duplicate certificates are not allowed.',
             // Skills
             'skills.array'    => 'Skills must be provided as a list.',
             'skills.max'      => 'You cannot add more than 20 skills.',

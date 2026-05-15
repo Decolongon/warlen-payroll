@@ -7,6 +7,7 @@ import {
     Briefcase,
     MapPin,
     Calendar,
+    Clock,
     LoaderCircle,
     PersonStanding,
     Shield,
@@ -16,6 +17,9 @@ import {
     Users,
     Plus,
     X,
+    Award,
+    Gavel,
+    BookOpen,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { update } from '@/actions/App/Http/Controllers/HrRole/HREmployeeController';
@@ -75,7 +79,7 @@ const computeAge = (dob: string): string => {
     return age >= 0 ? String(age) : '';
 };
 
-// Format date range into human-readable string
+// Human-readable duration formatter
 function formatDateRange(startDateStr: string | null, endDateStr: string | null): string {
     if (!startDateStr || !endDateStr) return 'Undefined';
 
@@ -113,6 +117,17 @@ const STATUS_LABEL: Record<string, string> = {
     awol: 'AWOL',
     terminated: 'Terminated',
     resigned: 'Resigned',
+};
+
+const getStatusFromDates = (start: string, end: string): string => {
+    if (!start || !end) return 'newly_hired';
+    const today = new Date();
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    today.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+    return today >= startDate && today <= endDate ? 'active' : 'newly_hired';
 };
 
 function SearchableDropdown({
@@ -209,10 +224,12 @@ function SkillsInput({
     skills,
     onChange,
     error,
+    placeholder = "e.g., Plumbing, Electrical, Carpentry, Welding",
 }: {
     skills: string[];
     onChange: (skills: string[]) => void;
     error?: string;
+    placeholder?: string;
 }) {
     const [input, setInput] = useState('');
 
@@ -240,7 +257,7 @@ function SkillsInput({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type a skill and press Enter or +"
+                    placeholder={placeholder}
                     className="rounded-xl"
                     maxLength={50}
                 />
@@ -275,6 +292,83 @@ function SkillsInput({
                 </div>
             )}
             <p className="text-xs text-muted-foreground">{skills.length}/20 skills added</p>
+            {error && <InputError message={error} />}
+        </div>
+    );
+}
+
+function CertificateInput({
+    certificates,
+    onChange,
+    error,
+    placeholder = "e.g., TESDA NC II, OSHA Certified",
+}: {
+    certificates: string[];
+    onChange: (certificates: string[]) => void;
+    error?: string;
+    placeholder?: string;
+}) {
+    const [input, setInput] = useState('');
+
+    const add = () => {
+        const trimmed = input.trim();
+        if (!trimmed || certificates.includes(trimmed) || certificates.length >= 10) return;
+        onChange([...certificates, trimmed]);
+        setInput('');
+    };
+
+    const remove = (cert: string) => onChange(certificates.filter(c => c !== cert));
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <Label className="text-sm font-semibold">Certificate / Qualification</Label>
+            <div className="flex gap-2">
+                <Input
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    className="rounded-xl"
+                    maxLength={100}
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={add}
+                    disabled={!input.trim() || certificates.length >= 10}
+                    className="shrink-0 rounded-xl"
+                >
+                    <Plus className="h-4 w-4" />
+                </Button>
+            </div>
+            {certificates.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                    {certificates.map(cert => (
+                        <span
+                            key={cert}
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400"
+                        >
+                            {cert}
+                            <button
+                                type="button"
+                                onClick={() => remove(cert)}
+                                className="ml-0.5 rounded hover:text-destructive"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+            <p className="text-xs text-muted-foreground">{certificates.length}/10 certificates added</p>
             {error && <InputError message={error} />}
         </div>
     );
@@ -352,6 +446,8 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
     const [showPagibig, setShowPagibig] = useState(false);
     const [showPhilhealth, setShowPhilhealth] = useState(false);
     const [showTin, setShowTin] = useState(false);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Employees', href: '/hr/employees' },
@@ -373,13 +469,27 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         return [];
     };
 
+    // Parse certificates safely
+    const parseCertificates = (certData: any): string[] => {
+        if (Array.isArray(certData)) return certData;
+        if (typeof certData === 'string' && certData) {
+            try {
+                const parsed = JSON.parse(certData);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return certData ? [certData] : [];
+            }
+        }
+        return [];
+    };
+
     const { data, setData, put, processing, errors } = useForm({
         name: employee.user?.name || '',
         email: employee.user?.email || '',
         password: '',
         emp_code: employee.emp_code || '',
         employee_number: employee.employee_number || '',
-        avatar: employee.avatar || '',
+        avatar: null as File | null,
         remove_avatar: undefined as string | undefined,
         position_id: employee.position_id?.toString() || '',
         branch_id: employee.branch_id?.toString() || '',
@@ -401,15 +511,33 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         mother_name: employee.mother_name || '',
         father_name: employee.father_name || '',
         educ_attainment: employee.educ_attainment || '',
-        certificate: employee.certificate || '',
+        certificate: parseCertificates(employee.certificate),
         permanent_address: employee.permanent_address || '',
         present_address: employee.present_address || '',
         skills: parseSkills(employee.skills),
     });
 
+    // Set avatar preview from existing avatar
+    useEffect(() => {
+        if (employee.avatar) {
+            setAvatarPreview(`/storage/${employee.avatar}`);
+        }
+    }, [employee.avatar]);
+
+    // Auto‑compute age from DOB
     useEffect(() => {
         setData('age', computeAge(data.dob));
     }, [data.dob]);
+
+    // Auto‑derive employee_status from contract dates
+    useEffect(() => {
+        setData(
+            'employee_status',
+            data.contract_start_date && data.contract_end_date
+                ? getStatusFromDates(data.contract_start_date, data.contract_end_date)
+                : 'newly_hired',
+        );
+    }, [data.contract_start_date, data.contract_end_date]);
 
     useEffect(() => {
         const selectedPos = positions?.find((p) => p.id === parseInt(data.position_id));
@@ -433,33 +561,27 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         }
     }, [data.branch_id]);
 
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setData('avatar', file);
+        setAvatarPreview(URL.createObjectURL(file));
+        setData('remove_avatar', undefined);
+    };
+
+    const handleRemoveAvatar = () => {
+        setData('avatar', null);
+        setAvatarPreview(null);
+        setData('remove_avatar', 'true');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
     const handleGovNumberChange = (
         field: 'sss_number' | 'pagibig_number' | 'philhealth_number' | 'tin_number',
         value: string,
         maxLength: number
     ) => {
         setData(field, value.replace(/[^0-9\-]/g, '').slice(0, maxLength));
-    };
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [avatarPreview, setAvatarPreview] = useState<string | null>(
-        employee.avatar ? `/storage/${employee.avatar}` : null
-    );
-
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setAvatarPreview(URL.createObjectURL(file));
-            setData('avatar', file as any);
-            setData('remove_avatar', undefined);
-        }
-    };
-
-    const handleRemoveAvatar = () => {
-        setAvatarPreview(null);
-        setData('avatar', null);
-        setData('remove_avatar', 'true');
-        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -481,7 +603,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
         .filter((s) => s.name.toLowerCase().includes(siteSearch.toLowerCase()))
         .slice(0, 5);
 
-    // Compute formatted duration on every render
+    // Compute formatted duration
     const contractDuration = formatDateRange(data.contract_start_date, data.contract_end_date);
 
     return (
@@ -552,7 +674,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                                 onClick={() => fileInputRef.current?.click()}
                                                 disabled={processing}
                                             >
-                                                Change avatar
+                                                Choose image
                                             </Button>
                                             {avatarPreview && (
                                                 <Button
@@ -567,7 +689,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                             )}
                                         </div>
                                         <p className="text-xs text-muted-foreground">
-                                            Square image, at least 200×200px. Max size: 2MB
+                                            Square image, at least 200×200 px. Max 2 MB.
                                         </p>
                                     </div>
                                     <Input
@@ -594,6 +716,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <Input
                                         value={data.emp_code}
                                         onChange={(e) => setData('emp_code', e.target.value)}
+                                        placeholder="e.g., 1001"
                                         className="rounded-xl"
                                     />
                                     <InputError message={errors.emp_code} />
@@ -605,6 +728,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <Input
                                         value={data.name}
                                         onChange={(e) => setData('name', e.target.value)}
+                                        placeholder="Juan Dela Cruz"
                                         className="rounded-xl"
                                     />
                                     <InputError message={errors.name} />
@@ -617,6 +741,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                         type="email"
                                         value={data.email}
                                         onChange={(e) => setData('email', e.target.value)}
+                                        placeholder="juan@example.com"
                                         className="rounded-xl"
                                     />
                                     <InputError message={errors.email} />
@@ -712,22 +837,20 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                     <InputError message={errors.father_name} />
                                 </div>
 
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label className="text-sm font-semibold">Certificate / Qualification</Label>
-                                    <Input
-                                        value={data.certificate}
-                                        onChange={(e) => setData('certificate', e.target.value)}
-                                        placeholder="e.g., TESDA NC II – Electrical Installation"
-                                        className="rounded-xl"
-                                        maxLength={255}
+                                {/* Certificate - Left Column */}
+                                <div className="space-y-2">
+                                    <CertificateInput
+                                        certificates={data.certificate}
+                                        onChange={certs => setData('certificate', certs)}
+                                        error={errors.certificate}
                                     />
-                                    <InputError message={errors.certificate} />
                                 </div>
 
-                                <div className="sm:col-span-2">
+                                {/* Skills - Right Column */}
+                                <div className="space-y-2">
                                     <SkillsInput
                                         skills={data.skills}
-                                        onChange={(skills) => setData('skills', skills)}
+                                        onChange={skills => setData('skills', skills)}
                                         error={errors.skills as string | undefined}
                                     />
                                 </div>
@@ -767,6 +890,17 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                         {/* 5. Employee Details */}
                         <FormSection icon={Briefcase} title="Employee Details" index={5}>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold">
+                                        Contact Number <span className="text-destructive">*</span>
+                                    </Label>
+                                    <PhoneInput
+                                        value={data.employee_number}
+                                        onChange={(val) => setData('employee_number', val)}
+                                        error={errors.employee_number}
+                                    />
+                                </div>
+
                                 <SearchableDropdown
                                     label="Position"
                                     items={filteredPositions}
@@ -814,17 +948,6 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                         ))}
                                     </select>
                                     <InputError message={errors.employee_status} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">
-                                        Contact Number <span className="text-destructive">*</span>
-                                    </Label>
-                                    <PhoneInput
-                                        value={data.employee_number}
-                                        onChange={(val) => setData('employee_number', val)}
-                                        error={errors.employee_number}
-                                    />
                                 </div>
 
                                 <div className="space-y-2">
@@ -909,7 +1032,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">PhilHealth Identification Number (PIN)</Label>
+                                    <Label className="text-sm font-semibold">PhilHealth ID Number (PIN)</Label>
                                     <div className="relative">
                                         <Input
                                             type={showPhilhealth ? 'text' : 'password'}
@@ -954,7 +1077,7 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                             </div>
                         </FormSection>
 
-                        {/* 7. Assignment & Contract Period */}
+                        {/* 7. Location Assignment */}
                         <FormSection icon={MapPin} title="Assignment & Contract Period" index={7}>
                             <div className="space-y-6">
                                 {/* Location row */}
@@ -1009,10 +1132,9 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                         />
                                         <InputError message={errors.contract_start_date} />
                                     </div>
+
                                     <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">
-                                            End Date <span className="text-destructive">*</span>
-                                        </Label>
+                                        <Label className="text-sm font-semibold">End Date</Label>
                                         <input
                                             type="date"
                                             value={data.contract_end_date}
@@ -1022,7 +1144,8 @@ export default function Update({ positions, branches, employee, site = [] }: Pro
                                         />
                                         <InputError message={errors.contract_end_date} />
                                     </div>
-                                    {/* Duration display - HUMAN READABLE */}
+
+                                    {/* Human‑readable duration */}
                                     <div className="sm:col-span-2">
                                         <Label className="text-sm font-semibold">Contract Duration</Label>
                                         <div className="flex h-11 items-center rounded-xl border-2 border-border bg-muted/30 px-4 text-sm text-foreground">

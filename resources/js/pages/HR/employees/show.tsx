@@ -51,7 +51,7 @@ interface Employee {
     mother_name?: string;
     father_name?: string;
     educ_attainment?: string;
-    certificate?: string;
+    certificate?: string[] | string | null;
     // Address
     permanent_address?: string;
     present_address?: string;
@@ -101,7 +101,7 @@ const computeDuration = (startStr?: string | null): string => {
     return `${years} yr${years !== 1 ? 's' : ''}, ${months} mo${months !== 1 ? 's' : ''}`;
 };
 
-const normaliseSkills = (raw?: string[] | string | null): string[] => {
+const normaliseArray = (raw?: string[] | string | null): string[] => {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw.filter(Boolean);
     try {
@@ -223,7 +223,7 @@ function InfoBlock({ label, value }: { label: string; value?: string | null }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SkillChips
+   Chip components
    ───────────────────────────────────────────────────────────── */
 function SkillChips({ skills }: { skills: string[] }) {
     if (skills.length === 0) {
@@ -234,6 +234,21 @@ function SkillChips({ skills }: { skills: string[] }) {
             {skills.map((s, i) => (
                 <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#1d4791]/8 text-[#1d4791] border border-[#1d4791]/15">
                     {s}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+function CertificateChips({ certificates }: { certificates: string[] }) {
+    if (certificates.length === 0) {
+        return <span className="text-xs text-slate-300 italic">No certificates listed</span>;
+    }
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {certificates.map((cert, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    {cert}
                 </span>
             ))}
         </div>
@@ -264,7 +279,8 @@ export default function Show({ employee }: PageProps) {
         ? employee.avatar.startsWith('http') ? employee.avatar : `/storage/${employee.avatar}`
         : null;
     const employeeName = employee.user?.name || 'Employee';
-    const skills       = normaliseSkills(employee.skills);
+    const skills       = normaliseArray(employee.skills);
+    const certificates = normaliseArray(employee.certificate);
     const duration     = computeDuration(employee.contract_start_date);
 
     return (
@@ -466,18 +482,14 @@ export default function Show({ employee }: PageProps) {
                             <Award className="h-3.5 w-3.5 text-white/75" />
                             <h3 className="text-[10px] font-bold tracking-widest uppercase text-white">Skills &amp; Qualifications</h3>
                         </div>
-                        <div className="p-4 flex-1">
-                            <div className="space-y-3">
-                                <div>
-                                    <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Skills</p>
-                                    <SkillChips skills={skills} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Certificate</p>
-                                    <p className={`text-xs font-medium ${employee.certificate ? 'text-slate-800' : 'text-slate-300 italic'}`}>
-                                        {employee.certificate || '—'}
-                                    </p>
-                                </div>
+                        <div className="p-4 flex-1 space-y-4">
+                            <div>
+                                <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Skills</p>
+                                <SkillChips skills={skills} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1.5">Certificates</p>
+                                <CertificateChips certificates={certificates} />
                             </div>
                         </div>
                     </div>

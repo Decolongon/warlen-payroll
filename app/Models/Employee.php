@@ -81,6 +81,7 @@ class Employee extends Model
         'philhealth_number' => 'encrypted',
         'tin_number' => 'encrypted',
         'skills' => 'array',
+        'certificate' => 'array',
         'duration' => 'integer',
         'dob' => 'date',
         'age' => 'integer',
@@ -340,12 +341,7 @@ class Employee extends Model
     }
 
     // Certificate (filename or description)
-    protected function certificate(): Attribute
-    {
-        return Attribute::make(
-            set: fn($value) => trim(strip_tags($value)),
-        );
-    }
+
 
     // Permanent address
     protected function permanentAddress(): Attribute

@@ -3,6 +3,8 @@ import {
     Search, ChevronDown, User, Briefcase, MapPin, Calendar,
     Clock, LoaderCircle, PersonStanding, Shield, BookOpen,
     Home, Users, Plus, X,
+    Award,
+    Gavel,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { store } from '@/actions/App/Http/Controllers/HrRole/HREmployeeController';
@@ -236,10 +238,12 @@ function SkillsInput({
     skills,
     onChange,
     error,
+    placeholder = "e.g., Plumbing, Electrical, Carpentry, Welding",
 }: {
     skills: string[];
     onChange: (skills: string[]) => void;
     error?: string;
+    placeholder?: string;
 }) {
     const [input, setInput] = useState('');
 
@@ -267,7 +271,7 @@ function SkillsInput({
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type a skill and press Enter or +"
+                    placeholder={placeholder}
                     className="rounded-xl"
                     maxLength={50}
                 />
@@ -302,6 +306,83 @@ function SkillsInput({
                 </div>
             )}
             <p className="text-xs text-muted-foreground">{skills.length}/20 skills added</p>
+            {error && <InputError message={error} />}
+        </div>
+    );
+}
+
+function CertificateInput({
+    certificates,
+    onChange,
+    error,
+    placeholder = "e.g., TESDA NC II, OSHA Certified",
+}: {
+    certificates: string[];
+    onChange: (certificates: string[]) => void;
+    error?: string;
+    placeholder?: string;
+}) {
+    const [input, setInput] = useState('');
+
+    const add = () => {
+        const trimmed = input.trim();
+        if (!trimmed || certificates.includes(trimmed) || certificates.length >= 10) return;
+        onChange([...certificates, trimmed]);
+        setInput('');
+    };
+
+    const remove = (cert: string) => onChange(certificates.filter(c => c !== cert));
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <Label className="text-sm font-semibold">Certificate / Qualification</Label>
+            <div className="flex gap-2">
+                <Input
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    className="rounded-xl"
+                    maxLength={100}
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={add}
+                    disabled={!input.trim() || certificates.length >= 10}
+                    className="shrink-0 rounded-xl"
+                >
+                    <Plus className="h-4 w-4" />
+                </Button>
+            </div>
+            {certificates.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                    {certificates.map(cert => (
+                        <span
+                            key={cert}
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400"
+                        >
+                            {cert}
+                            <button
+                                type="button"
+                                onClick={() => remove(cert)}
+                                className="ml-0.5 rounded hover:text-destructive"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+            <p className="text-xs text-muted-foreground">{certificates.length}/10 certificates added</p>
             {error && <InputError message={error} />}
         </div>
     );
@@ -378,7 +459,7 @@ export default function Create({ positions, branches, site = [] }: Props) {
         mother_name: '',
         father_name: '',
         educ_attainment: '',
-        certificate: '',
+        certificate: [] as string[],
         permanent_address: '',
         present_address: '',
         skills: [] as string[],
@@ -633,18 +714,17 @@ export default function Create({ positions, branches, site = [] }: Props) {
                                     />
                                     <InputError message={errors.father_name} />
                                 </div>
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label className="text-sm font-semibold">Certificate / Qualification</Label>
-                                    <Input
-                                        value={data.certificate}
-                                        onChange={e => setData('certificate', e.target.value)}
-                                        placeholder="e.g., TESDA NC II – Electrical Installation"
-                                        className="rounded-xl"
-                                        maxLength={255}
+                                {/* Certificate - Left Column */}
+                                <div className="space-y-2">
+                                    <CertificateInput
+                                        certificates={data.certificate}
+                                        onChange={certs => setData('certificate', certs)}
+                                        error={errors.certificate}
                                     />
-                                    <InputError message={errors.certificate} />
                                 </div>
-                                <div className="sm:col-span-2">
+
+                                {/* Skills - Right Column */}
+                                <div className="space-y-2">
                                     <SkillsInput
                                         skills={data.skills}
                                         onChange={skills => setData('skills', skills)}
