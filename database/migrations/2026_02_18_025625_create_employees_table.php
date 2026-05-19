@@ -34,7 +34,7 @@ return new class extends Migration
             $table->string('mother_name')->nullable();
             $table->string('father_name')->nullable();
             $table->string('educ_attainment')->nullable();
-            $table->string('certificate')->nullable();
+            $table->json('certificate')->nullable();
             $table->string('permanent_address')->nullable();
             $table->string('present_address')->nullable();
             $table->date('contract_start_date');

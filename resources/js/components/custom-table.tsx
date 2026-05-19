@@ -390,11 +390,10 @@ function ColumnToggleDropdown({
                         >
                             {/* Custom checkbox */}
                             <div
-                                className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                                    isVisible
-                                        ? 'bg-[#1d4791] border-[#1d4791]'
-                                        : 'border-slate-300 dark:border-slate-600 bg-transparent'
-                                }`}
+                                className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isVisible
+                                    ? 'bg-[#1d4791] border-[#1d4791]'
+                                    : 'border-slate-300 dark:border-slate-600 bg-transparent'
+                                    }`}
                             >
                                 {isVisible && (
                                     <LucidIcons.Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
@@ -439,8 +438,7 @@ export const CustomTable = ({
     onEmail,
     title,
     toolbar,
-    filterEmptyState,
-    emptyState,
+    emptyState, // Only one empty state prop now
     hasActiveFilters = false,
     isLoading = false,
     selectable = false,
@@ -479,7 +477,7 @@ export const CustomTable = ({
         setHiddenColumns(defaultHidden);
     };
 
-    // Columns filtered by visibility — non-toggleable cols always visible
+    // Columns filtered by visibility
     const visibleColumns = useMemo(
         () => columns.filter(col => !col.toggleable || !hiddenColumns.has(col.key)),
         [columns, hiddenColumns]
@@ -490,7 +488,6 @@ export const CustomTable = ({
         [columns]
     );
 
-    // ── Derived column sets ──────────────────────────────────────────────
     const dataColumns = visibleColumns.filter(col => !col.isAction);
     const hasActions = visibleColumns.some(col => col.isAction);
     const actionProps = { actions, onDelete, onView, onEdit, onRestore, onRunPayroll, onEmail, route };
@@ -614,11 +611,8 @@ export const CustomTable = ({
                         </div>
                     )}
 
-                    {/* UPDATED: Show appropriate empty state */}
-                    {hasActiveFilters
-                        ? (filterEmptyState || <EmptyState />)
-                        : (emptyState || <EmptyState />)
-                    }
+                    {/* Show the single emptyState passed from parent */}
+                    {emptyState || <EmptyState />}
                 </div>
             </div>
         );
@@ -658,9 +652,8 @@ export const CustomTable = ({
                 {data.map((row, index) => (
                     <div
                         key={row.id || index}
-                        className={`px-4 py-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150 ${
-                            selectedIds.includes(row.id) ? 'bg-blue-50 dark:bg-blue-950/30' : ''
-                        }`}
+                        className={`px-4 py-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150 ${selectedIds.includes(row.id) ? 'bg-blue-50 dark:bg-blue-950/30' : ''
+                            }`}
                     >
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
@@ -727,9 +720,8 @@ export const CustomTable = ({
                 {data.map((row, index) => (
                     <div
                         key={row.id || index}
-                        className={`rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/60 p-4 hover:border-[#1d4791]/40 dark:hover:border-[#1d4791]/50 hover:shadow-md transition-all duration-200 group ${
-                            selectedIds.includes(row.id) ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-950/30' : ''
-                        }`}
+                        className={`rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/60 p-4 hover:border-[#1d4791]/40 dark:hover:border-[#1d4791]/50 hover:shadow-md transition-all duration-200 group ${selectedIds.includes(row.id) ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-950/30' : ''
+                            }`}
                     >
                         <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-700/60">
                             <div className="flex items-center gap-3">
@@ -844,7 +836,7 @@ export const CustomTable = ({
                     )}
 
                     {/* Column toggle button — sits before headerActions */}
-                    {toggleableColumns.length > 0 && (
+                    {toggleableColumns.length >= 0 && (
                         <ColumnToggleDropdown
                             toggleableColumns={toggleableColumns}
                             hiddenColumns={hiddenColumns}

@@ -1,5 +1,5 @@
 import { Head, useForm, router } from '@inertiajs/react';
-import { Calendar, Sheet, ChartSpline, Clock, ScrollText, Upload, Loader2, Search } from 'lucide-react';
+import { Calendar, Sheet, ChartSpline, Clock, ScrollText, Upload, Loader2, Search, X } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 
 // Components
@@ -241,13 +241,21 @@ export default function AttendanceManagement({
     const [activeMainTab, setActiveMainTab] = useState(currentTab);
     const [activeSubTab, setActiveSubTab] = useState<'table' | 'timeline' | 'calendar'>('table');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isTableLoading, setIsTableLoading] = useState(true); // CHANGED: Start with true to show skeleton immediately
+    const [isTableLoading, setIsTableLoading] = useState(true);
     const [localSearch, setLocalSearch] = useState(filters.search || '');
     const [animateHeader, setAnimateHeader] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const initialLoadRef = useRef(true); // Track initial load
+    const initialLoadRef = useRef(true);
 
     const { data, setData } = useForm({
         search: filters.search || '',
@@ -256,6 +264,18 @@ export default function AttendanceManagement({
 
     // Check if any filters are active
     const hasFilters = !!localSearch;
+    const showFilterEmptyState = hasFilters || isClearingFilters || (lastSearchTerm && lastSearchTerm.trim() !== '');
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No ${current.title?.toLowerCase() || 'records'} matching "${lastSearchTerm}".`;
+        }
+        if (localSearch) {
+            return `No ${current.title?.toLowerCase() || 'records'} matching "${localSearch}".`;
+        }
+        return `No ${current.title?.toLowerCase() || 'records'} match your current filters.`;
+    };
 
     // Refresh data function
     const refreshData = useCallback(() => {
@@ -437,7 +457,7 @@ export default function AttendanceManagement({
                     setIsTableLoading(false);
                     initialLoadRef.current = false;
                 }
-            }, 1000); // Fallback timeout
+            }, 1000);
         }
 
         return () => {
@@ -446,11 +466,10 @@ export default function AttendanceManagement({
             removeFinishListener();
             if (timeoutId) clearTimeout(timeoutId);
         };
-    }, []); // Run once on mount
+    }, []);
 
     // Effect to watch for data changes and turn off loading
     useEffect(() => {
-        // If we're loading and data arrives, turn off loading
         if (isTableLoading && initialLoadRef.current) {
             const currentData = getCurrentData();
             if (currentData.data.length > 0 || currentData.totalCount > 0) {
@@ -461,7 +480,7 @@ export default function AttendanceManagement({
                 return () => clearTimeout(timer);
             }
         }
-    }, [logs, exceptionStats, schedules, periodStats]); // Watch for data changes
+    }, [logs, exceptionStats, schedules, periodStats]);
 
     // ==========================================================================
     // TAB CHANGE HANDLER
@@ -523,6 +542,8 @@ export default function AttendanceManagement({
     // ==========================================================================
 
     const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (isClearingRef.current) return;
+        
         const value = e.target.value;
         setLocalSearch(value);
 
@@ -558,6 +579,8 @@ export default function AttendanceManagement({
     }, [activeMainTab, data.perPage, localSearch]);
 
     const handlePerPageChange = useCallback((value: string) => {
+        if (isClearingRef.current) return;
+        
         setData('perPage', value);
         setIsTableLoading(true);
 
@@ -583,11 +606,28 @@ export default function AttendanceManagement({
     }, [activeMainTab, localSearch]);
 
     const handleResetFilters = useCallback(() => {
+        // Store current filter values before clearing
+        setLastSearchTerm(localSearch);
+        
+        // Clear any pending timers
+        if (searchTimer.current) {
+            clearTimeout(searchTimer.current);
+        }
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Set clearing flag
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Reset all filter states immediately
         setLocalSearch('');
         setData('search', '');
         setData('perPage', '10');
         setIsTableLoading(true);
 
+        // Navigate with cleared filters
         router.get('/attendances', {
             tab: activeMainTab,
             perPage: '10',
@@ -595,12 +635,17 @@ export default function AttendanceManagement({
             preserveState: true,
             preserveScroll: true,
             onFinish: () => {
-                setTimeout(() => {
-                    setIsTableLoading(false);
-                }, 150);
+                clearFiltersTimer.current = setTimeout(() => {
+                    isClearingRef.current = false;
+                    setIsClearingFilters(false);
+                    // Clear stored filters after a delay
+                    setTimeout(() => {
+                        setLastSearchTerm('');
+                    }, 1000);
+                }, 500);
             }
         });
-    }, [activeMainTab]);
+    }, [activeMainTab, localSearch]);
 
     // ==========================================================================
     // FORMAT DATA FOR DISPLAY
@@ -925,9 +970,9 @@ export default function AttendanceManagement({
                                     onClick={handleResetFilters}
                                     variant="outline"
                                     className="h-10"
-                                    disabled={!localSearch}
+                                    disabled={isClearingFilters}
                                 >
-                                    Clear
+                                    {isClearingFilters ? 'Clearing...' : 'Clear'}
                                 </Button>
                             </div>
                         )}
@@ -964,9 +1009,9 @@ export default function AttendanceManagement({
                             onClick={handleResetFilters}
                             variant="outline"
                             className="h-10"
-                            disabled={!localSearch}
+                            disabled={isClearingFilters}
                         >
-                            Clear
+                            {isClearingFilters ? 'Clearing...' : 'Clear'}
                         </Button>
                     </div>
                 )}
@@ -975,7 +1020,7 @@ export default function AttendanceManagement({
                 <div className="relative min-h-[400px]">
                     {activeSubTab === 'table' ? (
                         <>
-                            {/* Table with Skeleton Loader - ALWAYS show skeleton when loading */}
+                            {/* Table with Skeleton Loader */}
                             {isTableLoading ? (
                                 <div className='pp-row'>
                                     <TableSkeleton
@@ -997,61 +1042,59 @@ export default function AttendanceManagement({
                                         totalCount={current.totalCount}
                                         filteredCount={current.filteredCount}
                                         searchTerm={localSearch}
+                                        hasActiveFilters={hasFilters}
                                         onDelete={() => { }}
                                         onView={() => { }}
                                         onEdit={() => { }}
                                         title={current.title || currentMainTab.label}
-                                        hasActiveFilters={!!localSearch}
-                                        searchTerm={localSearch}
                                         emptyState={
-                                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                                    {activeMainTab === 'logs' && <ScrollText className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
-                                                    {activeMainTab === 'exceptions' && <ChartSpline className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
-                                                    {activeMainTab === 'schedules' && <Clock className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
-                                                    {activeMainTab === 'periods' && <Calendar className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                            showFilterEmptyState ? (
+                                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                                        {activeMainTab === 'logs' && <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                        {activeMainTab === 'exceptions' && <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                        {activeMainTab === 'schedules' && <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                        {activeMainTab === 'periods' && <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                    </div>
+                                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                                        No results found
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                        {getFilterDisplayText()}
+                                                    </p>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                                        onClick={handleResetFilters}
+                                                        disabled={isClearingFilters}
+                                                    >
+                                                        {isClearingFilters ? 'Clearing filters...' : 'Clear filters'}
+                                                    </Button>
                                                 </div>
-                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                                    {
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                                        {activeMainTab === 'logs' && <ScrollText className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                                                        {activeMainTab === 'exceptions' && <ChartSpline className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                                                        {activeMainTab === 'schedules' && <Clock className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                                                        {activeMainTab === 'periods' && <Calendar className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                                                    </div>
+                                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
                                                         {
-                                                            'logs': 'No attendance logs yet.',
-                                                            'exceptions': 'No attendance exceptions yet.',
-                                                            'schedules': 'No attendance schedules yet.',
-                                                            'periods': 'No attendance period stats yet.',
-                                                        }[activeMainTab] || 'No results found.'
-                                                    }
-                                                </h3>
-
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                    Please import the attendance to get started.
-                                                </p>
-                                                {localSearch && (
-                                                    <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                                                        Clear filters
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        }
-                                        filterEmptyState={
-                                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                                    {activeMainTab === 'logs' && <ScrollText className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
-                                                    {activeMainTab === 'exceptions' && <ChartSpline className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
-                                                    {activeMainTab === 'schedules' && <Clock className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
-                                                    {activeMainTab === 'periods' && <Calendar className="h-5 w-5 text-slate-400 dark:text-slate-500" />}
+                                                            {
+                                                                'logs': 'No attendance logs yet.',
+                                                                'exceptions': 'No attendance exceptions yet.',
+                                                                'schedules': 'No attendance schedules yet.',
+                                                                'periods': 'No attendance period stats yet.',
+                                                            }[activeMainTab] || 'No results found.'
+                                                        }
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                        Please import attendance data to get started.
+                                                    </p>
                                                 </div>
-                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No results found</h3>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                    {localSearch
-                                                        ? `No ${(current.title || currentMainTab.label).toLowerCase()} matching "${localSearch}".`
-                                                        : `No ${(current.title || currentMainTab.label).toLowerCase()} available at the moment.`}
-                                                </p>
-                                                {localSearch && (
-                                                    <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                                                        Clear filters
-                                                    </Button>
-                                                )}
-                                            </div>
+                                            )
                                         }
                                     />
                                 </div>
@@ -1081,6 +1124,12 @@ export default function AttendanceManagement({
                     ) : activeMainTab === 'logs' && activeSubTab === 'timeline' ? (
                         isTableLoading ? (
                             <TimelineSkeleton />
+                        ) : timelineDataFormatted.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                <Clock className="h-12 w-12 text-slate-400 dark:text-slate-500 mb-3" />
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No timeline data available</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">No attendance records found for the timeline view.</p>
+                            </div>
                         ) : (
                             <AttendanceLogTimeline
                                 logs={timelineDataFormatted}
@@ -1092,6 +1141,12 @@ export default function AttendanceManagement({
                     ) : activeMainTab === 'exceptions' && activeSubTab === 'calendar' ? (
                         isTableLoading ? (
                             <CalendarSkeleton />
+                        ) : calendarDataFormatted.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                <Calendar className="h-12 w-12 text-slate-400 dark:text-slate-500 mb-3" />
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">No calendar data available</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">No exception records found for the calendar view.</p>
+                            </div>
                         ) : (
                             <ExceptionStatsTimeline
                                 exceptions={calendarDataFormatted}

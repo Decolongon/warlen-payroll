@@ -48,9 +48,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @routes
+<<<<<<< HEAD
         <!-- @vite('resources/js/app.tsx') -->
         @viteReactRefresh
         @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"]) 
+=======
+         @vite('resources/js/app.tsx')
+        <!-- @viteReactRefresh
+        @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"]) -->
+>>>>>>> 0086fed74d7fcc8b178a9993ddbd09e3f0715ea2
     @inertiaHead
 </head>
 

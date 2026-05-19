@@ -1,10 +1,6 @@
 import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-<<<<<<< HEAD
 import { Users, Search, UserPlus, Archive, CircleUser, RotateCcw, Briefcase, Building2, Plus, X } from 'lucide-react';
-=======
-import { Users, Search, UserPlus, Archive, UsersRound, RotateCcw, Briefcase, Building2 } from 'lucide-react';
->>>>>>> 91360a15993c9d9665abaa9bd773b8975e392ff1
 import { useState, useRef, useMemo, useEffect } from 'react';
 import EmployeeController from '@/actions/App/Http/Controllers/EmployeeController';
 import { CustomHeader } from '@/components/custom-header';
@@ -23,7 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import branches from '@/routes/branches';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Employees', href: '/employees' }];
 
@@ -66,7 +61,6 @@ interface FilterProps {
     positions?: string;
     branch?: string;
     site?: string;
-    /** Single employee_status enum value, or "" for all */
     status?: string;
     date_from?: string;
     date_to?: string;
@@ -109,6 +103,7 @@ export default function Index({
     totalCount,
     filteredCount,
 }: PageProps) {
+
     const { delete: destroy } = useForm();
     const { props } = usePage<{ flash?: { success?: string; error?: string; warning?: string; info?: string } }>();
 
@@ -140,7 +135,6 @@ export default function Index({
     );
     const [selectedBranch, setSelectedBranch] = useState(filters.branch ?? '');
     const [selectedSite, setSelectedSite] = useState(filters.site ?? '');
-    // Single status value from server
     const [status, setStatus] = useState(filters.status ?? '');
     const [dateFrom, setDateFrom] = useState<Date | undefined>(
         filters.date_from ? new Date(filters.date_from) : undefined,
@@ -148,6 +142,31 @@ export default function Index({
     const [dateTo, setDateTo] = useState<Date | undefined>(
         filters.date_to ? new Date(filters.date_to) : undefined,
     );
+
+    // ── Clear filters loading state ──────────────────────────────────────────
+    const [isClearingFilters, setIsClearingFilters] = useState(false);
+    const isClearingRef = useRef(false);
+    const clearFiltersTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
+    // Store last filter values for display during clearing
+    const [lastSearchTerm, setLastSearchTerm] = useState('');
+    const [lastFilters, setLastFilters] = useState<{
+        searchTerm: string;
+        positions: string[];
+        branch: string;
+        site: string;
+        status: string;
+        dateFrom: Date | undefined;
+        dateTo: Date | undefined;
+    }>({
+        searchTerm: '',
+        positions: [],
+        branch: '',
+        site: '',
+        status: '',
+        dateFrom: undefined,
+        dateTo: undefined,
+    });
 
     // ── Archived tab filter state (client-side) ──────────────────────────────
     const [archivedSearchTerm, setArchivedSearchTerm] = useState('');
@@ -263,24 +282,27 @@ export default function Index({
             showArchived: boolean;
         }> = {},
     ) {
-        const s   = overrides.search    ?? searchTerm;
+        // Don't apply filters while clearing
+        if (isClearingRef.current) return;
+        
+        const s = overrides.search ?? searchTerm;
         const pos = overrides.positions ?? selectedPositions;
-        const br  = overrides.branch    ?? selectedBranch;
-        const si  = overrides.site      ?? selectedSite;
-        const st  = overrides.status ?? status;
+        const br = overrides.branch ?? selectedBranch;
+        const si = overrides.site ?? selectedSite;
+        const st = overrides.status ?? status;
         const from = overrides.from !== undefined ? overrides.from : dateFrom;
-        const to   = overrides.to   !== undefined ? overrides.to   : dateTo;
-        const pp   = overrides.perPage  ?? String(employees.perPage ?? 10);
+        const to = overrides.to !== undefined ? overrides.to : dateTo;
+        const pp = overrides.perPage ?? String(employees.perPage ?? 10);
         const showArchived = overrides.showArchived !== undefined ? overrides.showArchived : activeTab === 'archived';
 
         const params: Record<string, string> = {};
-        if (s.trim())    params.search    = s.trim();
-        if (pos.length)  params.positions = pos.join(',');
-        if (br)          params.branch    = br;
-        if (si)          params.site      = si;
-        if (st)          params.status    = st;
-        if (from)        params.date_from = format(from, 'yyyy-MM-dd');
-        if (to)          params.date_to   = format(to, 'yyyy-MM-dd');
+        if (s.trim()) params.search = s.trim();
+        if (pos.length) params.positions = pos.join(',');
+        if (br) params.branch = br;
+        if (si) params.site = si;
+        if (st) params.status = st;
+        if (from) params.date_from = format(from, 'yyyy-MM-dd');
+        if (to) params.date_to = format(to, 'yyyy-MM-dd');
         if (pp && pp !== '10') params.perPage = pp;
         if (showArchived) params.show_archived = 'true';
 
@@ -303,45 +325,83 @@ export default function Index({
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleSearchChange = (value: string) => {
+        if (isClearingRef.current) return;
         setSearchTerm(value);
         if (searchTimer.current) clearTimeout(searchTimer.current);
         searchTimer.current = setTimeout(() => applyFilters({ search: value }), 300);
     };
 
     const handleBranchChange = (branch: string) => {
+        if (isClearingRef.current) return;
         setSelectedBranch(branch);
         setSelectedSite('');
         applyFilters({ branch, site: '' });
     };
 
     const handlePositionsChange = (positions: string[]) => {
+        if (isClearingRef.current) return;
         setSelectedPositions(positions);
         applyFilters({ positions });
     };
 
     const handleSiteChange = (site: string) => {
+        if (isClearingRef.current) return;
         setSelectedSite(site);
         applyFilters({ site });
     };
 
     const handleStatusChange = (value: string) => {
+        if (isClearingRef.current) return;
         setStatus(value);
         applyFilters({ status: value });
     };
 
     const handleDateFromChange = (from: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateFrom(from);
         applyFilters({ from });
     };
 
     const handleDateToChange = (to: Date | undefined) => {
+        if (isClearingRef.current) return;
         setDateTo(to);
         applyFilters({ to });
     };
 
-    const handlePerPageChange = (value: string) => applyFilters({ perPage: value });
+    const handlePerPageChange = (value: string) => {
+        if (isClearingRef.current) return;
+        applyFilters({ perPage: value });
+    };
 
     const clearActiveFilters = () => {
+        // Store current filter values before clearing
+        setLastSearchTerm(searchTerm);
+        setLastFilters({
+            searchTerm,
+            positions: [...selectedPositions],
+            branch: selectedBranch,
+            site: selectedSite,
+            status,
+            dateFrom,
+            dateTo,
+        });
+        
+        // Clear any pending search timer
+        if (searchTimer.current) {
+            clearTimeout(searchTimer.current);
+            searchTimer.current = null;
+        }
+        
+        // Set clearing flag to prevent conflicting requests
+        isClearingRef.current = true;
+        setIsClearingFilters(true);
+        
+        // Clear any existing clear filters timer
+        if (clearFiltersTimer.current) {
+            clearTimeout(clearFiltersTimer.current);
+        }
+        
+        // Reset all filter states immediately
         setSearchTerm('');
         setSelectedPositions([]);
         setSelectedBranch('');
@@ -349,10 +409,35 @@ export default function Index({
         setStatus('');
         setDateFrom(undefined);
         setDateTo(undefined);
+        
+        // Navigate with cleared filters
         router.get(
             '/employees',
             activeTab === 'archived' ? { show_archived: 'true' } : {},
-            { preserveState: true, replace: true },
+            { 
+                preserveState: true, 
+                replace: true,
+                onFinish: () => {
+                    // Set a timeout to match the debounce duration (300ms)
+                    clearFiltersTimer.current = setTimeout(() => {
+                        isClearingRef.current = false;
+                        setIsClearingFilters(false);
+                        // Clear stored filters after a delay
+                        setTimeout(() => {
+                            setLastSearchTerm('');
+                            setLastFilters({
+                                searchTerm: '',
+                                positions: [],
+                                branch: '',
+                                site: '',
+                                status: '',
+                                dateFrom: undefined,
+                                dateTo: undefined,
+                            });
+                        });
+                    });
+                }
+            },
         );
     };
 
@@ -363,10 +448,10 @@ export default function Index({
         return Array.from(positions).sort();
     }, [archivedEmployees]);
 
-    const handleArchivedSearchChange   = (value: string)     => { setArchivedSearchTerm(value);             setArchivedPage(1); };
-    const handleArchivedPositionsChange = (pos: string[])    => { setArchivedSelectedPositions(pos);        setArchivedPage(1); };
-    const handleArchivedBranchChange   = (branch: string)    => { setArchivedSelectedBranch(branch); setArchivedSelectedSite(''); setArchivedPage(1); };
-    const handleArchivedSiteChange     = (site: string)      => { setArchivedSelectedSite(site);            setArchivedPage(1); };
+    const handleArchivedSearchChange = (value: string) => { setArchivedSearchTerm(value); setArchivedPage(1); };
+    const handleArchivedPositionsChange = (pos: string[]) => { setArchivedSelectedPositions(pos); setArchivedPage(1); };
+    const handleArchivedBranchChange = (branch: string) => { setArchivedSelectedBranch(branch); setArchivedSelectedSite(''); setArchivedPage(1); };
+    const handleArchivedSiteChange = (site: string) => { setArchivedSelectedSite(site); setArchivedPage(1); };
 
     const clearArchivedFilters = () => {
         setArchivedSearchTerm('');
@@ -386,6 +471,54 @@ export default function Index({
         dateFrom,
         dateTo,
     ].filter(Boolean).length;
+
+    // Determine which empty state to show
+    const hasActiveFilters = activeFiltersCount > 0;
+    const showFilterEmptyState = hasActiveFilters || 
+                                (searchTerm && searchTerm.trim() !== '') || 
+                                isClearingFilters ||
+                                (lastSearchTerm && lastSearchTerm.trim() !== '');
+
+    // Helper to format filter display text
+    const getFilterDisplayText = () => {
+        if (isClearingFilters && lastSearchTerm) {
+            return `No employees matching "${lastFilters.searchTerm}".`;
+        }
+        if (isClearingFilters && lastFilters.branch) {
+            if (lastFilters.site) {
+                return `No employees in ${lastFilters.branch} / ${lastFilters.site}.`;
+            }
+            return `No employees in ${lastFilters.branch}.`;
+        }
+        if (isClearingFilters && lastFilters.positions.length > 0) {
+            return `No employees matching ${lastFilters.positions.join(', ')} in selected positions.`;
+        }
+        if (isClearingFilters && lastFilters.status) {
+            return `No employees with status "${lastFilters.status}".`;
+        }
+        if (isClearingFilters && (lastFilters.dateFrom || lastFilters.dateTo)) {
+            return `No employees in the selected date range.`;
+        }
+        if (searchTerm && selectedPositions.length > 0) {
+            return `No employees matching "${searchTerm}" in selected positions.`;
+        }
+        if (searchTerm) {
+            return `No employees matching "${searchTerm}".`;
+        }
+        if (selectedBranch && selectedSite) {
+            return `No employees in ${selectedBranch} / ${selectedSite}.`;
+        }
+        if (selectedBranch) {
+            return `No employees in ${selectedBranch}.`;
+        }
+        if (dateFrom || dateTo) {
+            return 'No employees in the selected date range.';
+        }
+        if (status) {
+            return `No employees with status "${status}".`;
+        }
+        return 'No employees match your current filters.';
+    };
 
     // ── Bulk archive ─────────────────────────────────────────────────────────
     const handleBulkArchive = () => { if (selectedIds.length) setBulkArchiveConfirmOpen(true); };
@@ -491,6 +624,7 @@ export default function Index({
     const handleView = (employee: Employee) => router.get(EmployeeController.show(employee.slug_emp).url);
     const handleEdit = (employee: Employee) => router.get(EmployeeController.edit(employee.slug_emp).url);
 
+
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -518,14 +652,14 @@ export default function Index({
                 />
 
                 {employees.total >= 1 && (
-                <Link href="/employees/create">
-                    <Button className="hover:cursor-pointer flex ml-auto">
-                        <UserPlus className="h-5 w-5" />
-                        <div className="flex flex-col items-start leading-tight">
-                            <span className="text-sm font-medium"><Plus /> Add Employee</span>
-                        </div>
-                    </Button>
-                </Link>
+                    <Link href="/employees/create">
+                        <Button className="hover:cursor-pointer flex ml-auto">
+                            <UserPlus className="h-5 w-5" />
+                            <div className="flex flex-col items-start leading-tight">
+                                <span className="text-sm font-medium">Add Employee</span>
+                            </div>
+                        </Button>
+                    </Link>
                 )}
             </div>
 
@@ -661,7 +795,7 @@ export default function Index({
                                     onSelectChange={setSelectedIds}
                                     selectAll={selectedIds.length === employees.data.length && employees.data.length > 0}
                                     searchTerm={searchTerm}
-                                    hasActiveFilters={activeFiltersCount > 0}
+                                    hasActiveFilters={hasActiveFilters}
                                     toolbar={
                                         <EmployeeFilterBar
                                             filters={{
@@ -693,46 +827,44 @@ export default function Index({
                                             dateLabel="Hire Date"
                                         />
                                     }
-                                    filterEmptyState={
-                                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                                <X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-                                            </div>
-                                            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                                No results found
-                                            </h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                {searchTerm && selectedPositions.length > 0
-                                                    ? `No employees matching "${searchTerm}" in selected positions.`
-                                                    : searchTerm
-                                                        ? `No employees matching "${searchTerm}".`
-                                                        : selectedBranch && selectedSite ? `No employees in ${selectedBranch} / ${selectedSite}.`
-                                                            : selectedBranch
-                                                                ? `No employees in ${selectedBranch}.`
-                                                                : dateFrom || dateTo
-                                                                    ? 'No employees in the selected date range.'
-                                                                    : 'No employees match your current filters.'}
-                                            </p>
-                                            <Button variant="outline" size="sm" className="cursor-pointer" onClick={clearActiveFilters}>
-                                                Clear filters
-                                            </Button>
-                                        </div>
-                                    }
                                     emptyState={
-                                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
-                                                <CircleUser className="h-5 w-5 text-slate-400 dark:text-slate-500" strokeWidth={1.75} />
+                                        showFilterEmptyState ? (
+                                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                                    <X className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                                                </div>
+                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                                    No results found
+                                                </h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                    {getFilterDisplayText()}
+                                                </p>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-xl border-2 border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 cursor-pointer"
+                                                    onClick={clearActiveFilters}
+                                                    disabled={isClearingFilters}
+                                                >
+                                                    {isClearingFilters ? 'Clearing filters...' : 'Clear filters'} 
+                                                </Button>
                                             </div>
-                                            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                                                No employees yet.
-                                            </h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                Get started by creating your first employee.
-                                            </p>
-                                            <Link href="/employees/create">
-                                                <Button><Plus /> Add Employee</Button>
-                                            </Link>
-                                        </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
+                                                    <CircleUser className="h-5 w-5 text-slate-400 dark:text-slate-500" strokeWidth={1.75} />
+                                                </div>
+                                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                                                    No employees yet.
+                                                </h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                    Get started by creating your first employee.
+                                                </p>
+                                                <Link href="/employees/create">
+                                                    <Button><Plus /> Add Employee</Button>
+                                                </Link>
+                                            </div>
+                                        )
                                     }
                                 />
                                 <CustomPagination
@@ -810,7 +942,7 @@ export default function Index({
                                                 searchPlaceholder="Search archived employees..."
                                             />
                                         }
-                                        filterEmptyState={
+                                        emptyState={
                                             <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
                                                 <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-3">
                                                     <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
@@ -819,8 +951,8 @@ export default function Index({
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
                                                     {archivedSearchTerm ? `No archived employees matching "${archivedSearchTerm}".`
                                                         : archivedSelectedBranch && archivedSelectedSite ? `No archived employees in ${archivedSelectedBranch} / ${archivedSelectedSite}.`
-                                                        : archivedSelectedBranch ? `No archived employees in ${archivedSelectedBranch}.`
-                                                        : 'No archived employees match your current filters.'}
+                                                            : archivedSelectedBranch ? `No archived employees in ${archivedSelectedBranch}.`
+                                                                : 'No archived employees match your current filters.'}
                                                 </p>
                                                 <Button variant="outline" size="sm" onClick={clearArchivedFilters}>Clear filters</Button>
                                             </div>
