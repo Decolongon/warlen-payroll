@@ -32,6 +32,17 @@ Leveraging WebSocket technology, the system provides **real-time monitoring** of
 | **Queue**      | Redis / Database – For background job processing (payroll batches, emails) |
 | **Dev Tools**  | Composer, NPM, Vite, Git, Artisan Tinker |
 
+**Screenshots:**
+
+![Login Page](public/images/screenshots/login.png)
+*Figure 1: Secure Authentication / Login Page*
+
+![Dashboard](public/images/screenshots/dashboard.png)
+*Figure 2: Payroll Dashboard – Total Net Pay, Employee Distribution, Payroll Activity*
+
+![Payroll Periods](public/images/screenshots/run-payroll.png)
+*Figure 3: Payroll Periods Management – View, Edit, and Run Payroll*
+
 ## Key Features
 
 ### 👥 Employee Management
